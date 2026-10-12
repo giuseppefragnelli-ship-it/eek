@@ -413,6 +413,17 @@ body.touch span.tc { display: inline; }
 .qrow.ready { background: #1d1a0b; }
 .qrow.ready .sname { color: #d1a93a; }
 .tabpanel { max-height: 56vh; overflow: auto; }
+.qcats { display: flex; gap: 2px; flex-wrap: wrap; margin: 0 0 6px; border-bottom: 1px solid var(--lo2); padding-bottom: 4px; }
+.qcats .tab { position: relative; height: 24px; top: 0; }
+.qcats .tab small { color: var(--dim); font-weight: normal; }
+.qcats .qdot { position: absolute; top: -5px; right: -4px; min-width: 13px; height: 13px; padding: 0 2px; box-sizing: border-box; border-radius: 7px; background: #d1a93a; color: #000; font: bold 9px/13px var(--font); font-style: normal; text-align: center; }
+.orow .ocol { min-width: 0; }
+.orow .omen { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 3px; padding: 2px 4px; background: #0b0a0f; }
+.orow .omen.empty span { color: var(--dim); letter-spacing: 3px; }
+.orow.off .omen span { opacity: .55; }
+.btn.mini, .srow .btn.mini, body.touch .srow .btn.mini { min-width: 0; width: auto; grid-column: auto; height: 21px; padding: 0 6px; font-size: 11px; flex: none; }
+.srow.orow { grid-template-columns: 40px 1fr; }
+@media (max-width: 600px) { .srow.orow { grid-template-columns: 34px 1fr; } }
 .end-quests { margin-top: 10px; padding: 6px 8px; background: #1d1a0b; color: #d1a93a; font-weight: bold; font-size: 12px; }
 
 /* ---------- pausa: build ---------- */
@@ -601,7 +612,7 @@ body.touch.st-play #dashbtn { display: block; }
 #m-menu .mbtn { min-width: 0 !important; flex: none !important; height: 52px !important; flex-direction: column; gap: 3px !important; padding: 4px 2px !important; position: relative; font-size: 12px !important; }
 .mbtn img { width: 22px; height: 20px; object-fit: contain; }
 .badge-dot { position: absolute; top: 4px; right: 6px; min-width: 8px; height: 8px; border-radius: 50%; background: var(--fluo-coin); box-shadow: 0 0 0 1px #000, 0 0 8px var(--fluo-coin); animation: blink 1s steps(1) infinite; }
-.menu-tip { grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; background: #0b0a0f; color: var(--text2); font-size: 11px; line-height: 1.35; cursor: pointer;
+.menu-tip { display: none !important; grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; background: #0b0a0f; color: var(--text2); font-size: 11px; line-height: 1.35; cursor: pointer;
   box-shadow: inset 1px 1px #000, inset -1px -1px var(--hi2); min-height: 2.7em; }
 .menu-tip img { width: 12px; height: 16px; object-fit: contain; flex: none; margin-top: 1px; }
 .menu-tip span { animation: tipin .3s steps(3); }
@@ -689,7 +700,7 @@ body.touch.st-play #dashbtn { display: block; }
 
   <!-- BOSS + AVVISI -->
   <div class="window" id="bossbar">
-    <div class="titlebar small"><img data-spr="ico_skull"><span id="boss-name">Re della Melma Nera</span></div>
+    <div class="titlebar small"><img data-spr="ico_skull"><span id="boss-name">Flegiàs</span></div>
     <div class="sunken bb"><div id="boss-fill"></div></div>
   </div>
   <div class="window" id="toast">
@@ -709,7 +720,7 @@ body.touch.st-play #dashbtn { display: block; }
             <img data-spr="slime_fast" class="hs hs1"><img data-spr="slime_heavy" class="hs hs2"><img data-spr="slime_spitter" class="hs hs3"><img data-spr="slime_drop" class="hs hs4"><img data-spr="slime_elite" class="hs hs5">
           </div>
           <div class="logo-title"><span class="lt1">SLIME</span><span class="lt2">SURVIVORS</span><span class="lt98">98</span></div>
-          <div class="logo-sub">nove cerchi di melma · scendi, resisti, risali</div>
+          <div class="logo-sub">per me si va ne la città dolente</div>
         </div>
 
         <div class="menu-grid">
@@ -877,7 +888,7 @@ body.touch.st-play #dashbtn { display: block; }
             <tr><td>Mappa</td><td id="d-map"></td></tr>
             <tr><td>Difficoltà</td><td id="d-diff"></td></tr>
             <tr><td>Tempo</td><td id="d-time2"></td></tr>
-            <tr><td>Slime eliminati</td><td id="d-kills"></td></tr>
+            <tr><td>Dannati uccisi</td><td id="d-kills"></td></tr>
             <tr><td>Livello</td><td id="d-level"></td></tr>
             <tr><td>Monete raccolte</td><td id="d-coins"></td></tr>
             <tr><td>Bonus sopravvivenza</td><td id="d-bonus"></td></tr>
@@ -1011,9 +1022,9 @@ const CFG = {
 // coin = moltiplicatore probabilità di drop monete (più difficile = più soldi)
 // ----------------------------------------------------------------------------
 const DIFFICULTY = {
-  normale:   { label: 'Normale',   spawn: 0.85, hp: 1.0,  dmg: 1.15, speed: 1.0,  coin: 1, desc: 'Per imparare. Ma gli slime mordono. Monete x1.' },
-  difficile: { label: 'Difficile', spawn: 1.8,  hp: 1.25, dmg: 1.6,  speed: 1.12, coin: 3, desc: 'Se stai fermo, a 20 secondi non ci arrivi. Monete x3.' },
-  incubo:    { label: 'Incubo',    spawn: 2.4,  hp: 1.6,  dmg: 2.0,  speed: 1.25, coin: 5, desc: 'Ogni secondo va guadagnato. Monete x5.' },
+  normale:   { label: 'Normale',   spawn: 0.85, hp: 1.0,  dmg: 1.15, speed: 1.0,  coin: 1, desc: '"Facilis descensus Averno." · Monete x1' },
+  difficile: { label: 'Difficile', spawn: 1.8,  hp: 1.25, dmg: 1.6,  speed: 1.12, coin: 3, desc: '"Lasciate ogne speranza, voi ch\'intrate." · Monete x3' },
+  incubo:    { label: 'Incubo',    spawn: 2.4,  hp: 1.6,  dmg: 2.0,  speed: 1.25, coin: 5, desc: '"Non ragioniam di lor, ma guarda e passa." · Monete x5' },
 };
 const DEFAULT_DIFFICULTY = 'difficile';
 
@@ -1022,20 +1033,20 @@ const DEFAULT_DIFFICULTY = 'difficile';
 // coin = probabilità di lasciare una moneta
 // ----------------------------------------------------------------------------
 const ENEMY_DEFS = [
-  { id: 'heavy',   name: 'Slime Pesante',     sprite: 'slime_heavy',   hp: 26, speed: 50,  dmg: 10, r: 15, mass: 3.0, xp: 3, coin: 0.022, splat: 'C' },
-  { id: 'fast',    name: 'Slime Lampo',       sprite: 'slime_fast',    hp: 7,  speed: 128, dmg: 6,  r: 9,  mass: 0.7, xp: 1, coin: 0.009, splat: 'B' },
-  { id: 'spitter', name: 'Slime Sputacchino', sprite: 'slime_spitter', hp: 14, speed: 60,  dmg: 7,  r: 12, mass: 1.2, xp: 2, coin: 0.015, splat: '8' },
-  { id: 'boss',    name: 'Re della Melma Nera', sprite: 'boss_black', hp: 3200, speed: 46, dmg: 28, r: 140, mass: 80, xp: 0, coin: 0, splat: '4', boss: true },
-  { id: 'boss2',   name: 'Signore della Tempesta', sprite: 'boss_storm', hp: 4400, speed: 36, dmg: 26, r: 140, mass: 80, xp: 0, coin: 0, splat: 'n', boss: true },
-  { id: 'elite',   name: 'Slime Cacciatore', sprite: 'slime_elite', hp: 260, speed: 92, dmg: 18, r: 22, mass: 6, xp: 25, coin: 0.15, splat: 'C' },
-  { id: 'boss3',   name: 'Slime Primordiale', sprite: 'boss_primal', hp: 7000, speed: 30, dmg: 30, r: 150, mass: 80, xp: 0, coin: 0, splat: 't', boss: true },
-  { id: 'drop',    name: 'Goccia',            sprite: 'slime_drop',    hp: 4,  speed: 82,  dmg: 4,  r: 7,  mass: 0.5, xp: 1, coin: 0.0045, splat: 'e' },
+  { id: 'heavy',   name: 'Gulosus',           sprite: 'slime_heavy',   hp: 26, speed: 50,  dmg: 10, r: 15, mass: 3.0, xp: 3, coin: 0.022, splat: 'C' },
+  { id: 'fast',    name: 'Ignavus',           sprite: 'slime_fast',    hp: 7,  speed: 128, dmg: 6,  r: 9,  mass: 0.7, xp: 1, coin: 0.009, splat: 'B' },
+  { id: 'spitter', name: 'Iracundus',         sprite: 'slime_spitter', hp: 14, speed: 60,  dmg: 7,  r: 12, mass: 1.2, xp: 2, coin: 0.015, splat: '8' },
+  { id: 'boss',    name: 'Flegiàs', sprite: 'boss_black', hp: 3200, speed: 46, dmg: 28, r: 140, mass: 80, xp: 0, coin: 0, splat: '4', boss: true },
+  { id: 'boss2',   name: 'Tifeo', sprite: 'boss_storm', hp: 4400, speed: 36, dmg: 26, r: 140, mass: 80, xp: 0, coin: 0, splat: 'n', boss: true },
+  { id: 'elite',   name: 'Venator', sprite: 'slime_elite', hp: 260, speed: 92, dmg: 18, r: 22, mass: 6, xp: 25, coin: 0.15, splat: 'C' },
+  { id: 'boss3',   name: 'Chaos', sprite: 'boss_primal', hp: 7000, speed: 30, dmg: 30, r: 150, mass: 80, xp: 0, coin: 0, splat: 't', boss: true },
+  { id: 'drop',    name: 'Larva',            sprite: 'slime_drop',    hp: 4,  speed: 82,  dmg: 4,  r: 7,  mass: 0.5, xp: 1, coin: 0.0045, splat: 'e' },
   // nemici speciali delle mappe
-  { id: 'toxic',   name: 'Slime Velenoso',    sprite: 'slime_toxic',   hp: 16, speed: 62,  dmg: 7,  r: 12, mass: 1.2, xp: 2, coin: 0.015, splat: 'e' },
-  { id: 'ghost',   name: 'Spettro',           sprite: 'ghost',         hp: 12, speed: 84,  dmg: 8,  r: 11, mass: 0.6, xp: 2, coin: 0.015, splat: '8' },
+  { id: 'toxic',   name: 'Accidiosus',       sprite: 'slime_toxic',   hp: 16, speed: 62,  dmg: 7,  r: 12, mass: 1.2, xp: 2, coin: 0.015, splat: 'e' },
+  { id: 'ghost',   name: 'Umbra',            sprite: 'ghost',         hp: 12, speed: 84,  dmg: 8,  r: 11, mass: 0.6, xp: 2, coin: 0.015, splat: '8' },
   { id: 'lupa',    name: 'Lupa',              sprite: 'slime_lupa',    hp: 22, speed: 96,  dmg: 9,  r: 12, mass: 1.0, xp: 3, coin: 0.018, splat: 'C' },
-  { id: 'furia',   name: 'Furia',             sprite: 'slime_furia',   hp: 18, speed: 70,  dmg: 8,  r: 12, mass: 1.0, xp: 3, coin: 0.018, splat: 'D' },
-  { id: 'gelido',  name: 'Traditore Gelido',  sprite: 'slime_gelido',  hp: 30, speed: 54,  dmg: 9,  r: 13, mass: 2.0, xp: 3, coin: 0.018, splat: 'u' },
+  { id: 'furia',   name: 'Erinys',           sprite: 'slime_furia',   hp: 18, speed: 70,  dmg: 8,  r: 12, mass: 1.0, xp: 3, coin: 0.018, splat: 'D' },
+  { id: 'gelido',  name: 'Proditor',         sprite: 'slime_gelido',  hp: 30, speed: 54,  dmg: 9,  r: 13, mass: 2.0, xp: 3, coin: 0.018, splat: 'u' },
 ];
 // LUPA (Selva Oscura): ti punta, si ferma un attimo e balza (come un piccolo Cacciatore)
 const LUPA = { chaseTime: 1.7, tell: 0.35, dashSpeed: 330, dashTime: 0.32 };
@@ -1153,7 +1164,7 @@ const WEAPON_DEFS = {
   // Il livello dipende dal fabbro (+0..+5 -> indici 0..5).
   dagger: {
     name: 'Pugio', icon: 'it_dagger', gear: true,
-    desc: 'Pugnale romano: fendente automatico verso lo slime più vicino.',
+    desc: '"Tu quoque, Brute, fili mi?"',
     levels: [
       { dmg: 14, cd: 1.00, range: 62, arc: 1.9, kb: 90 },
       { dmg: 20, cd: 0.95, range: 66, arc: 1.9, kb: 95 },
@@ -1166,7 +1177,7 @@ const WEAPON_DEFS = {
   // LANCIA — affondo lungo e stretto nella direzione in cui vai: trapassa tutta la fila
   spear: {
     name: 'Hasta', icon: 'it_spear', gear: true,
-    desc: 'Lancia del legionario: affondo lungo che trapassa tutta la fila.',
+    desc: '"Vae victis!"',
     levels: [
       { dmg: 20, cd: 1.25, range: 120, width: 13, kb: 120 },
       { dmg: 25, cd: 1.20, range: 126, width: 13, kb: 125 },
@@ -1178,8 +1189,8 @@ const WEAPON_DEFS = {
   },
   // ARCO — frecce perforanti nella direzione in cui vai
   bow: {
-    name: 'Arco di Chirone', icon: 'it_bow', gear: true,
-    desc: 'L\'arco del centauro (Inferno XII): frecce perforanti verso lo slime più vicino.',
+    name: 'Arcus Chironis', icon: 'it_bow', gear: true,
+    desc: '"Chirón prese uno strale."',
     levels: [
       { dmg: 11, cd: 0.85, amount: 1, speed: 560, pierce: 3 },
       { dmg: 14, cd: 0.80, amount: 1, speed: 580, pierce: 3 },
@@ -1193,7 +1204,7 @@ const WEAPON_DEFS = {
   // ASCIA — lanciata in alto, ricade spaccando tutto quello che incontra
   axe: {
     name: 'Bipennis', icon: 'it_axe', gear: true,
-    desc: 'Scure a doppia lama lanciata in alto: ricade spaccando tutto.',
+    desc: '"Carthago delenda est."',
     levels: [
       { dmg: 26, cd: 1.60, amount: 1, size: 1.0 },
       { dmg: 32, cd: 1.55, amount: 1, size: 1.0 },
@@ -1207,7 +1218,7 @@ const WEAPON_DEFS = {
 
   dart: {
     name: 'Sagitta', icon: 'ico_dart',
-    desc: 'Dardi di sale verso lo slime più vicino.',
+    desc: '"Volat irrevocabile verbum."',
     levels: [
       { dmg: 10, cd: 0.90, amount: 1, speed: 420, pierce: 1, kb: 60 },
       { dmg: 10, cd: 0.90, amount: 2, speed: 420, pierce: 1, kb: 60 },
@@ -1218,15 +1229,15 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 cristallo', '+danno, perfora 2', '+1 cristallo, ricarica più veloce', '+danno, +1 cristallo, perfora 3'],
     evo: {
       passive: 'cooldown', name: 'Piova Etterna', icon: 'ico_dart',
-      desc: '"Piova etterna, maladetta, fredda e greve" (Inf. VI): un flusso di sale che trapassa tutto.',
+      desc: '"Piova etterna, maladetta, fredda e greve."',
       stats: { dmg: 22, cd: 0.10, amount: 1, speed: 580, pierce: 5, kb: 40 },
     },
     burstDelay: 0.07, range: 520, life: 1.6,
   },
 
   aura: {
-    name: 'Primo Cerchio', icon: 'ico_aura',
-    desc: 'Un anello sacro che brucia gli slime vicini.',
+    name: 'Limbus', icon: 'ico_aura',
+    desc: '"Che \'n quel limbo eran sospesi."',
     levels: [
       { dmg: 5,  cd: 0.60, radius: 55, kb: 20 },
       { dmg: 6,  cd: 0.60, radius: 66, kb: 20 },
@@ -1237,14 +1248,14 @@ const WEAPON_DEFS = {
     upDesc: ['', '+raggio', '+danno, più frequente', '+danno, +raggio', '+danno, +raggio'],
     evo: {
       passive: 'maxhp', name: 'Nove Cerchi', icon: 'ico_aura',
-      desc: 'Tutti i cerchi dell\'Inferno insieme: anello enorme che rallenta gli slime.',
+      desc: '"Così discesi del cerchio primaio giù nel secondo."',
       stats: { dmg: 20, cd: 0.35, radius: 130, kb: 50, slow: 0.55 },
     },
   },
 
   orbit: {
-    name: 'Sfere Celesti', icon: 'ico_orb',
-    desc: 'Sfere del Paradiso che ti girano attorno.',
+    name: 'Sphaerae', icon: 'ico_orb',
+    desc: '"La gloria di colui che tutto move."',
     levels: [
       { dmg: 8,  amount: 2, radius: 60, spin: 3.2, size: 9,  kb: 40 },
       { dmg: 8,  amount: 3, radius: 60, spin: 3.2, size: 9,  kb: 40 },
@@ -1255,7 +1266,7 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 ampolla', '+danno, +raggio', '+1 ampolla, più veloci', '+danno, +1 ampolla'],
     evo: {
       passive: 'speed', name: 'Primo Mobile', icon: 'ico_orb',
-      desc: 'Il cielo che fa girare tutti gli altri: sette sfere in un vortice largo.',
+      desc: '"Per l\'universo penetra, e risplende."',
       stats: { dmg: 22, amount: 7, radius: 96, spin: 4.6, size: 12, kb: 60 },
     },
     hitCd: 0.45,
@@ -1263,7 +1274,7 @@ const WEAPON_DEFS = {
 
   lightning: {
     name: 'Fulmen', icon: 'ico_bolt',
-    desc: 'Fulmini su slime casuali sullo schermo.',
+    desc: '"Qual io fui vivo, tal son morto."',
     levels: [
       { dmg: 18, cd: 2.2, amount: 1, area: 24, chain: 0 },
       { dmg: 18, cd: 2.2, amount: 2, area: 24, chain: 0 },
@@ -1274,14 +1285,14 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 fulmine', '+danno, +area', '+1 fulmine, più frequente', '+danno, +1 fulmine'],
     evo: {
       passive: 'magnet', name: 'Iuppiter Tonans', icon: 'ico_bolt',
-      desc: 'L\'ira di Giove: i fulmini rimbalzano su 3 slime vicini.',
+      desc: '"Caelo tonantem credidimus Iovem regnare."',
       stats: { dmg: 40, cd: 1.2, amount: 5, area: 40, chain: 3 },
     },
   },
 
   bomb: {
     name: 'Ignis', icon: 'ico_bomb',
-    desc: 'Ampolle di fuoco lanciate sugli slime.',
+    desc: '"Ignis aurum probat."',
     levels: [
       { dmg: 22, cd: 2.6, amount: 1, area: 48, split: 0 },
       { dmg: 22, cd: 2.6, amount: 2, area: 48, split: 0 },
@@ -1292,7 +1303,7 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 granata', '+danno, +area', '+1 granata, più frequente', '+danno, +area'],
     evo: {
       passive: 'might', name: 'Falde di Fuoco', icon: 'ico_bomb',
-      desc: '"Dilatate falde" (Inf. XIV): esplode e piove in 4 schegge di fuoco.',
+      desc: '"Piovean di foco dilatate falde."',
       stats: { dmg: 50, cd: 1.6, amount: 4, area: 76, split: 4 },
     },
     flight: 0.6, range: 320,
@@ -1300,7 +1311,7 @@ const WEAPON_DEFS = {
 
   scythe: {
     name: 'Falx Lunae', icon: 'ico_scythe',
-    desc: 'Una mezzaluna che va e torna, trapassando tutto.',
+    desc: '"Tempus edax rerum."',
     levels: [
       { dmg: 12, cd: 1.8, amount: 1, speed: 360, life: 1.2, size: 1.0 },
       { dmg: 12, cd: 1.8, amount: 2, speed: 360, life: 1.2, size: 1.0 },
@@ -1311,14 +1322,14 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 falce', '+danno, più grande', '+1 falce, più frequente', '+danno, più grande'],
     evo: {
       passive: 'xp', name: 'Eclipsis', icon: 'ico_scythe',
-      desc: 'Cinque falci enormi che spazzano tutto attorno a te.',
+      desc: '"Sic transit gloria mundi."',
       stats: { dmg: 34, cd: 1.0, amount: 5, speed: 430, life: 1.5, size: 1.6 },
     },
   },
 
   acid: {
-    name: 'Acqua Stigia', icon: 'ico_acid',
-    desc: 'Fiale dello Stige che lasciano pozze corrosive a terra.',
+    name: 'Aqua Stygia', icon: 'ico_acid',
+    desc: '"Una palude fa, c\'ha nome Stige."',
     levels: [
       { dmg: 6,  cd: 3.0, amount: 1, area: 36, dur: 2.5 },
       { dmg: 6,  cd: 3.0, amount: 2, area: 36, dur: 2.5 },
@@ -1329,15 +1340,15 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 fiala', '+danno, pozze più larghe e lunghe', '+1 fiala, più frequente', '+danno, pozze più larghe'],
     evo: {
       passive: 'regen', name: 'Flegetonte', icon: 'ico_acid',
-      desc: 'Il fiume di sangue bollente: pozze enormi e durature che rallentano gli slime.',
+      desc: '"La riviera del sangue in la qual bolle."',
       stats: { dmg: 16, cd: 2.0, amount: 4, area: 72, dur: 5.0, slow: 0.5 },
     },
     flight: 0.5, range: 260, tick: 0.5,
   },
 
   wisps: {
-    name: 'Lingue di Fuoco', icon: 'ico_wisp',
-    desc: 'Le fiamme dei consiglieri fraudolenti (Inf. XXVI): inseguono gli slime da sole.',
+    name: 'Linguae Ignis', icon: 'ico_wisp',
+    desc: '"Ogni fiamma un peccatore invola."',
     levels: [
       { dmg: 14, cd: 1.6, amount: 2, speed: 220, pierce: 1 },
       { dmg: 14, cd: 1.6, amount: 3, speed: 220, pierce: 1 },
@@ -1348,7 +1359,7 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 fiammella', '+danno, più veloci', '+1 fiammella, perforano', '+danno, +1 fiammella'],
     evo: {
       passive: 'cooldown', name: 'Folle Volo', icon: 'ico_wisp',
-      desc: 'Il volo di Ulisse: otto fiamme che non mollano la preda.',
+      desc: '"De\' remi facemmo ali al folle volo."',
       stats: { dmg: 30, cd: 1.0, amount: 8, speed: 290, pierce: 3 },
     },
     life: 3.0, turn: 7,
@@ -1356,8 +1367,8 @@ const WEAPON_DEFS = {
 
   // FLAGELLO — sferzate orizzontali: prima dalla parte in cui guardi, poi dietro, poi sopra e sotto
   whip: {
-    name: 'Flagello', icon: 'ico_whip',
-    desc: 'La frusta dei demoni di Malebolge (Inf. XVIII): sferza davanti e dietro di te.',
+    name: 'Flagellum', icon: 'ico_whip',
+    desc: '"Ahi come facean lor levar le berze!"',
     levels: [
       { dmg: 13, cd: 1.35, amount: 1, range: 110, height: 20, kb: 70 },
       { dmg: 13, cd: 1.35, amount: 2, range: 110, height: 20, kb: 70 },
@@ -1368,7 +1379,7 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 sferzata (anche dietro)', '+danno, più lunga', '+1 sferzata, più frequente', '+danno, più lunga e larga'],
     evo: {
       passive: 'area', name: 'Malebolge', icon: 'ico_whip',
-      desc: 'Dieci bolge in una frusta: quattro sferzate enormi che lasciano gli slime storditi.',
+      desc: '"Luogo è in inferno detto Malebolge."',
       stats: { dmg: 36, cd: 0.85, amount: 4, range: 180, height: 32, kb: 110, stun: 0.6 },
     },
     gap: 0.12,             // secondi tra una sferzata e l'altra
@@ -1376,8 +1387,8 @@ const WEAPON_DEFS = {
 
   // BUFERA — turbini che vagano attorno a te e colpiscono di continuo chi c'è dentro
   storm: {
-    name: 'Bufera', icon: 'ico_storm',
-    desc: '"La bufera infernal, che mai non resta" (Inf. V): turbini che vagano e colpiscono di continuo.',
+    name: 'Procella', icon: 'ico_storm',
+    desc: '"La bufera infernal, che mai non resta."',
     levels: [
       { dmg: 7,  cd: 3.2, amount: 1, speed: 80, life: 3.0, size: 22, kb: 30 },
       { dmg: 7,  cd: 3.2, amount: 2, speed: 80, life: 3.0, size: 22, kb: 30 },
@@ -1388,7 +1399,7 @@ const WEAPON_DEFS = {
     upDesc: ['', '+1 turbine', '+danno, più grandi e lunghi', '+1 turbine, più frequenti', '+danno, più grandi'],
     evo: {
       passive: 'greed', name: 'Bufera Infernale', icon: 'ico_storm',
-      desc: 'Quattro turbini enormi che non si fermano mai e risucchiano gli slime.',
+      desc: '"Di qua, di là, di giù, di sù li mena."',
       stats: { dmg: 20, cd: 2.2, amount: 4, speed: 95, life: 5.0, size: 40, kb: -70 },
     },
     tick: 0.3, leash: 230,  // ogni quanto colpisce | quanto si allontana prima di tornare verso di te
@@ -1396,8 +1407,8 @@ const WEAPON_DEFS = {
 
   // LUME — raggi di luce che ti girano attorno come un faro: colpiscono tutto quello che spazzano
   beam: {
-    name: 'Lume', icon: 'ico_beam',
-    desc: 'Un raggio di luce del Paradiso che ti gira attorno come un faro.',
+    name: 'Lumen', icon: 'ico_beam',
+    desc: '"Luce intellettual, piena d\'amore."',
     levels: [
       { dmg: 14, spin: 2.6, amount: 1, range: 120, kb: 25 },
       { dmg: 18, spin: 2.6, amount: 1, range: 126, kb: 25 },
@@ -1408,15 +1419,15 @@ const WEAPON_DEFS = {
     upDesc: ['', '+danno', '+1 raggio, più veloce', '+danno, più lungo', '+danno, +1 raggio'],
     evo: {
       passive: 'amount', name: 'Candida Rosa', icon: 'ico_beam',
-      desc: '"In forma dunque di candida rosa" (Par. XXXI): cinque petali di luce che spazzano tutto.',
+      desc: '"In forma dunque di candida rosa."',
       stats: { dmg: 30, spin: 3.2, amount: 5, range: 180, kb: 40 },
     },
   },
 
   // GELO — onda di ghiaccio attorno a te: danno + rallentamento (l'evoluzione congela)
   frost: {
-    name: 'Gelo', icon: 'ico_frost',
-    desc: 'Il fiato gelido del Cocito: onda di ghiaccio che ferisce e rallenta tutti attorno a te.',
+    name: 'Gelu', icon: 'ico_frost',
+    desc: '"Lo \'mperador del doloroso regno."',
     levels: [
       { dmg: 14, cd: 3.4, amount: 1, radius: 95,  slow: 0.5,  dur: 1.4 },
       { dmg: 14, cd: 3.4, amount: 1, radius: 110, slow: 0.5,  dur: 1.6 },
@@ -1427,10 +1438,30 @@ const WEAPON_DEFS = {
     upDesc: ['', '+raggio, rallenta più a lungo', '+danno, rallenta di più', '+1 onda, più frequente', '+danno, +raggio'],
     evo: {
       passive: 'armor', name: 'Giudecca', icon: 'ico_frost',
-      desc: 'Il ghiaccio dei traditori: onde enormi che congelano gli slime sul posto.',
+      desc: '"Là dove l\'ombre tutte eran coperte."',
       stats: { dmg: 40, cd: 2.4, amount: 2, radius: 175, slow: 0.05, dur: 1.4 },
     },
     gap: 0.35, kb: 40,
+  },
+
+  // VITE AEREA — lame che si avvitano verso l'esterno lungo una spirale aurea (il raggio cresce di φ a ogni quarto di giro)
+  helix: {
+    name: 'Helix Aerea', icon: 'ico_helix',
+    desc: '"Qual è \'l geomètra che tutto s\'affige per misurar lo cerchio."',
+    levels: [
+      { dmg: 12, cd: 2.2, amount: 2, speed: 260, reach: 170, size: 7, kb: 40 },
+      { dmg: 12, cd: 2.2, amount: 3, speed: 260, reach: 170, size: 7, kb: 40 },
+      { dmg: 16, cd: 2.0, amount: 3, speed: 280, reach: 190, size: 8, kb: 45 },
+      { dmg: 16, cd: 1.8, amount: 4, speed: 280, reach: 200, size: 8, kb: 45 },
+      { dmg: 22, cd: 1.6, amount: 5, speed: 300, reach: 220, size: 9, kb: 50 },
+    ],
+    upDesc: ['', '+1 lama', '+danno, spirale più ampia', '+1 lama, più frequente', '+danno, +1 lama'],
+    evo: {
+      passive: 'speed', name: 'Grande Nibbio', icon: 'ico_helix',
+      desc: '"Piglierà il primo volo il grande uccello." Spirali in due sensi.',
+      stats: { dmg: 30, cd: 1.3, amount: 6, speed: 320, reach: 260, size: 10, kb: 60, twin: 1 },
+    },
+    r0: 14, phi: 1.6180339887,
   },
 };
 
@@ -1447,7 +1478,7 @@ const PASSIVE_DEFS = {
   cooldown: { name: 'Tempus Fugit',      icon: 'ico_hourglass', per: 0.06, desc: '-6% tempo di ricarica' },
   area:     { name: 'Statura di Anteo',  icon: 'ico_area',    per: 0.10, desc: '+10% area di tutte le armi' },
   amount:   { name: 'Gemelli',           icon: 'ico_twins',   per: 1,    max: 2, desc: '+1 proiettile a tutte le armi (max Lv 2)' },
-  greed:    { name: 'Fortuna',           icon: 'ico_greed',   per: 0.25, desc: '+25% monete dagli slime' },
+  greed:    { name: 'Fortuna',           icon: 'ico_greed',   per: 0.25, desc: '+25% monete' },
   armor:    { name: 'Lorica',            icon: 'ico_armor',   per: 1,    desc: '-1 danno a ogni colpo subito' },
 };
 const PASSIVE_MAX = 5;
@@ -1473,10 +1504,10 @@ const COIN = { perMinute: 1 };
 // shopLv = livello della bottega necessario per vederlo in vendita
 const gearFmt = (id, lead) => (L) => { const s = WEAPON_DEFS[id].levels[L]; return lead + s.dmg + ' danno ogni ' + s.cd.toFixed(2).replace(/0$/, '') + ' s' + (s.amount > 1 ? ' (x' + s.amount + ')' : ''); };
 const SHOP_ITEMS = {
-  dagger:   { name: 'Pugio',   icon: 'it_dagger',   vendor: 'weapons', shopLv: 0, price: 6,  gear: true, fmtL: gearFmt('dagger', 'Fendente: ') },
-  spear:    { name: 'Hasta',   icon: 'it_spear',    vendor: 'weapons', shopLv: 1, price: 10, gear: true, fmtL: gearFmt('spear', 'Affondo che trapassa la fila: ') },
-  bow:      { name: 'Arco di Chirone', icon: 'it_bow',      vendor: 'weapons', shopLv: 1, price: 10, gear: true, fmtL: gearFmt('bow', 'Frecce perforanti: ') },
-  axe:      { name: 'Bipennis', icon: 'it_axe',      vendor: 'weapons', shopLv: 2, price: 14, gear: true, fmtL: gearFmt('axe', 'Asce che ricadono: ') },
+  dagger:   { name: 'Pugio',   icon: 'it_dagger',   vendor: 'weapons', shopLv: 0, price: 6,  gear: true, fmtL: gearFmt('dagger', '') },
+  spear:    { name: 'Hasta',   icon: 'it_spear',    vendor: 'weapons', shopLv: 1, price: 10, gear: true, fmtL: gearFmt('spear', '') },
+  bow:      { name: 'Arcus Chironis', icon: 'it_bow',      vendor: 'weapons', shopLv: 1, price: 10, gear: true, fmtL: gearFmt('bow', '') },
+  axe:      { name: 'Bipennis', icon: 'it_axe',      vendor: 'weapons', shopLv: 2, price: 14, gear: true, fmtL: gearFmt('axe', '') },
   shield:   { name: 'Scutum',  icon: 'it_shield',   vendor: 'armor', shopLv: 0, price: 8,  base: 1,    per: 1,    fmt: (v) => '-' + v + ' danno a ogni colpo subito' },
   boots:    { name: 'Caligae', icon: 'it_boots',    vendor: 'armor', shopLv: 0, price: 5,  base: 0.04, per: 0.03, fmt: (v) => '+' + Math.round(v * 100) + '% velocità di movimento' },
   necklace: { name: 'Monile',  icon: 'it_necklace', vendor: 'armor', shopLv: 0, price: 7,  base: 10,   per: 10,   fmt: (v) => '+' + v + ' vita massima' },
@@ -1486,7 +1517,7 @@ const SHOP_ITEMS = {
 
 // BOTTEGHE — spendi monete per migliorarle: sbloccano oggetti nuovi (il fabbro diventa più bravo)
 const SHOP_UPGRADES = {
-  weapons: { costs: [12, 22], unlocks: ['Hasta e Arco di Chirone', 'Bipennis'] },
+  weapons: { costs: [12, 22], unlocks: ['Hasta e Arcus Chironis', 'Bipennis'] },
   armor:   { costs: [10, 20], unlocks: ['Anulus (+esperienza)', 'Pallium (+schivata)'] },
   smith:   { costs: [10, 20], unlocks: ['+5% di successo su ogni rafforzamento', '+10% di successo su ogni rafforzamento'], bonus: [0, 0.05, 0.10] },
 };
@@ -1501,40 +1532,115 @@ const SMITH = {
 };
 
 // MISSIONI della Bacheca — `check(s)` guarda le statistiche di carriera (Save.data), reward = monete
+// Categorie della Bacheca
+const QUEST_CATS = {
+  caedes: { name: 'Caedes' },     // uccisioni e boss
+  iter:   { name: 'Iter' },       // mappe e sopravvivenza
+  ars:    { name: 'Ars' },        // botteghe, fabbro, magister, aruspice
+  gloria: { name: 'Gloria' },     // difficoltà, infinita, record
+};
+const _maxRec = (d, diff) => { let m = 0; for (const k in d.records) if (k.endsWith('/' + diff)) m = Math.max(m, d.records[k].t || 0); return m; };
+const _winsAll = (d) => { let n = 0; for (const k in d.stats.winsDiff) n += d.stats.winsDiff[k]; return n; };
+const _mastSum = (d) => { let n = 0; for (const k in d.mastery) n += d.mastery[k]; return n; };
+const _hasDivine = (d) => { for (const k in d.omens) for (const o of d.omens[k]) if (o && o.r === 2) return true; return false; };
 const QUESTS = [
-  { id: 'k500',    name: 'Prime gocce',            desc: 'Elimina 500 slime in totale.',               reward: 3,  check: (d) => d.stats.kills >= 500,  prog: (d) => [d.stats.kills, 500] },
-  { id: 'surv5',   name: 'Tieni duro',             desc: 'Sopravvivi 5 minuti in una partita.',        reward: 3,  check: (d) => d.bestTime >= 300,    prog: (d) => [Math.floor(d.bestTime / 60), 5] },
-  { id: 'boss1',   name: 'Corona nera',            desc: 'Sconfiggi il Re della Melma Nera.',          reward: 5,  check: (d) => (d.stats.bosses.boss || 0) >= 1 },
-  { id: 'chest3',  name: 'Scassinatore',           desc: 'Apri 3 forzieri.',                           reward: 3,  check: (d) => d.stats.chests >= 3, prog: (d) => [d.stats.chests, 3] },
-  { id: 'evo1',    name: 'Alchimia proibita',      desc: 'Fai evolvere un\'arma.',                     reward: 4,  check: (d) => d.stats.evos >= 1 },
-  { id: 'elite10', name: 'Caccia ai cacciatori',   desc: 'Elimina 10 Cacciatori.',                     reward: 4,  check: (d) => d.stats.elites >= 10, prog: (d) => [d.stats.elites, 10] },
-  { id: 'boss2',   name: 'Parafulmine',            desc: 'Sconfiggi il boss del minuto 7.',            reward: 6,  check: (d) => (d.stats.bosses.boss2 || 0) >= 1 },
-  { id: 'smith3',  name: 'Mani d\'oro',            desc: 'Porta un oggetto a +3 dal Fabbro.',          reward: 5,  check: (d) => Object.keys(d.items).some((k) => d.items[k] >= 3) },
-  { id: 'win1',    name: 'Fine della cripta',      desc: 'Vinci una mappa (batti il boss del minuto 10).', reward: 8, check: (d) => !!d.wins.cripta },
-  { id: 'k5000',   name: 'Sterminatore',           desc: 'Elimina 5000 slime in totale.',              reward: 8,  check: (d) => d.stats.kills >= 5000, prog: (d) => [d.stats.kills, 5000] },
-  { id: 'palude',  name: 'Bonifica',               desc: 'Vinci la Palude Marcia.',                    reward: 10, check: (d) => !!d.wins.palude },
-  { id: 'hard',    name: 'Nessuna pietà',          desc: 'Vinci una mappa a Difficile.',               reward: 12, check: (d) => (d.stats.winsDiff.difficile || 0) + (d.stats.winsDiff.incubo || 0) >= 1 },
-  { id: 'endless', name: 'Oltre la fine',          desc: 'In modalità infinita arriva al minuto 15.',  reward: 10, check: (d) => d.stats.endlessBest >= 900, prog: (d) => [Math.floor(d.stats.endlessBest / 60), 15] },
-  { id: 'catt',    name: 'Sconsacrata',            desc: 'Vinci la Cattedrale Sconsacrata.',           reward: 15, check: (d) => !!d.wins.cattedrale },
-  { id: 'selva',   name: 'Nel mezzo del cammin',   desc: 'Vinci la Selva Oscura.',                     reward: 18, check: (d) => !!d.wins.selva },
-  { id: 'dite',    name: 'Le mura di Dite',        desc: 'Vinci la Città di Dite.',                    reward: 22, check: (d) => !!d.wins.dite },
-  { id: 'cocito',  name: 'E quindi uscimmo',       desc: 'Vinci il Cocito: "a riveder le stelle".',    reward: 30, check: (d) => !!d.wins.cocito },
-  { id: 'chars',   name: 'Locanda piena',          desc: 'Sblocca tutti i personaggi.',                reward: 10, check: (d) => Object.keys(CHARACTERS).every((c) => d.chars.indexOf(c) >= 0) },
-  { id: 'night',   name: 'Incubo',                 desc: 'Vinci una mappa a Incubo.',                  reward: 25, check: (d) => (d.stats.winsDiff.incubo || 0) >= 1 },
+  // CAEDES
+  { id: 'k500',    cat: 'caedes', name: 'Primi dannati',       desc: 'Uccidi 500 dannati.',                  reward: 3,  check: (d) => d.stats.kills >= 500,  prog: (d) => [d.stats.kills, 500] },
+  { id: 'k1000',   cat: 'caedes', name: 'Mille',               desc: 'Uccidi 1.000 dannati.',                reward: 4,  check: (d) => d.stats.kills >= 1000, prog: (d) => [d.stats.kills, 1000] },
+  { id: 'k5000',   cat: 'caedes', name: 'Sterminatore',        desc: 'Uccidi 5.000 dannati.',                reward: 8,  check: (d) => d.stats.kills >= 5000, prog: (d) => [d.stats.kills, 5000] },
+  { id: 'k20000',  cat: 'caedes', name: 'Strages',             desc: 'Uccidi 20.000 dannati.',               reward: 15, check: (d) => d.stats.kills >= 20000, prog: (d) => [d.stats.kills, 20000] },
+  { id: 'k100000', cat: 'caedes', name: 'Ecatombe',            desc: 'Uccidi 100.000 dannati.',              reward: 30, check: (d) => d.stats.kills >= 100000, prog: (d) => [d.stats.kills, 100000] },
+  { id: 'elite10', cat: 'caedes', name: 'Venatio',             desc: 'Uccidi 10 Venatores.',                 reward: 4,  check: (d) => d.stats.elites >= 10, prog: (d) => [d.stats.elites, 10] },
+  { id: 'elite50', cat: 'caedes', name: 'Venatio Magna',       desc: 'Uccidi 50 Venatores.',                 reward: 10, check: (d) => d.stats.elites >= 50, prog: (d) => [d.stats.elites, 50] },
+  { id: 'boss1',   cat: 'caedes', name: 'Corona nera',         desc: 'Uccidi Flegiàs.',                      reward: 5,  check: (d) => (d.stats.bosses.boss || 0) >= 1 },
+  { id: 'boss2',   cat: 'caedes', name: 'Parafulmine',         desc: 'Uccidi il guardiano del minuto VII.',  reward: 6,  check: (d) => (d.stats.bosses.boss2 || 0) >= 1 },
+  { id: 'boss2x10',cat: 'caedes', name: 'Custodes',            desc: 'Uccidi 10 guardiani del minuto VII.',  reward: 10, check: (d) => (d.stats.bosses.boss2 || 0) >= 10, prog: (d) => [d.stats.bosses.boss2 || 0, 10] },
+  { id: 'boss3x5', cat: 'caedes', name: 'Quinque coronae',     desc: 'Uccidi 5 guardiani del minuto X.',     reward: 12, check: (d) => (d.stats.bosses.boss3 || 0) >= 5, prog: (d) => [d.stats.bosses.boss3 || 0, 5] },
+  // ITER
+  { id: 'surv5',   cat: 'iter',   name: 'Tieni duro',          desc: 'Resisti 5 minuti.',                    reward: 3,  check: (d) => d.bestTime >= 300,    prog: (d) => [Math.floor(d.bestTime / 60), 5] },
+  { id: 'surv10',  cat: 'iter',   name: 'Decem minuta',        desc: 'Resisti 10 minuti.',                   reward: 5,  check: (d) => d.bestTime >= 600,    prog: (d) => [Math.floor(d.bestTime / 60), 10] },
+  { id: 'runs10',  cat: 'iter',   name: 'Peregrinus',          desc: 'Scendi 10 volte.',                     reward: 3,  check: (d) => d.runs >= 10, prog: (d) => [d.runs, 10] },
+  { id: 'runs50',  cat: 'iter',   name: 'Viator',              desc: 'Scendi 50 volte.',                     reward: 10, check: (d) => d.runs >= 50, prog: (d) => [d.runs, 50] },
+  { id: 'win1',    cat: 'iter',   name: 'Fine della cripta',   desc: 'Vinci la Cripta.',                     reward: 8,  check: (d) => !!d.wins.cripta },
+  { id: 'palude',  cat: 'iter',   name: 'Bonifica',            desc: 'Vinci la Palude Marcia.',              reward: 10, check: (d) => !!d.wins.palude },
+  { id: 'catt',    cat: 'iter',   name: 'Sconsacrata',         desc: 'Vinci la Cattedrale Sconsacrata.',     reward: 15, check: (d) => !!d.wins.cattedrale },
+  { id: 'selva',   cat: 'iter',   name: 'Nel mezzo del cammin',desc: 'Vinci la Selva Oscura.',               reward: 18, check: (d) => !!d.wins.selva },
+  { id: 'dite',    cat: 'iter',   name: 'Le mura di Dite',     desc: 'Vinci la Città di Dite.',              reward: 22, check: (d) => !!d.wins.dite },
+  { id: 'cocito',  cat: 'iter',   name: 'E quindi uscimmo',    desc: 'Vinci il Cocito.',                     reward: 30, check: (d) => !!d.wins.cocito },
+  { id: 'wins10',  cat: 'iter',   name: 'Decem victoriae',     desc: 'Vinci 10 volte.',                      reward: 15, check: (d) => _winsAll(d) >= 10, prog: (d) => [_winsAll(d), 10] },
+  // ARS
+  { id: 'chest3',  cat: 'ars',    name: 'Scassinatore',        desc: 'Apri 3 forzieri.',                     reward: 3,  check: (d) => d.stats.chests >= 3, prog: (d) => [d.stats.chests, 3] },
+  { id: 'chest25', cat: 'ars',    name: 'Arca',                desc: 'Apri 25 forzieri.',                    reward: 8,  check: (d) => d.stats.chests >= 25, prog: (d) => [d.stats.chests, 25] },
+  { id: 'evo1',    cat: 'ars',    name: 'Alchimia proibita',   desc: 'Evolvi un\'arma.',                     reward: 4,  check: (d) => d.stats.evos >= 1 },
+  { id: 'evo10',   cat: 'ars',    name: 'Transmutatio',        desc: 'Evolvi 10 armi.',                      reward: 10, check: (d) => d.stats.evos >= 10, prog: (d) => [d.stats.evos, 10] },
+  { id: 'smith3',  cat: 'ars',    name: 'Mani d\'oro',         desc: 'Un oggetto a +3.',                     reward: 5,  check: (d) => Object.keys(d.items).some((k) => d.items[k] >= 3) },
+  { id: 'smith5',  cat: 'ars',    name: 'Opus perfectum',      desc: 'Un oggetto a +5.',                     reward: 12, check: (d) => Object.keys(d.items).some((k) => d.items[k] >= 5) },
+  { id: 'allitems',cat: 'ars',    name: 'Armamentarium',       desc: 'Possiedi tutti gli oggetti.',          reward: 12, check: (d) => Object.keys(SHOP_ITEMS).every((k) => d.items[k] !== undefined), prog: (d) => [Object.keys(d.items).length, Object.keys(SHOP_ITEMS).length] },
+  { id: 'mast1',   cat: 'ars',    name: 'Primum studium',      desc: 'Studia dal Magister.',                 reward: 3,  check: (d) => _mastSum(d) >= 1 },
+  { id: 'mast10',  cat: 'ars',    name: 'Doctor',              desc: '10 gradi dal Magister.',               reward: 12, check: (d) => _mastSum(d) >= 10, prog: (d) => [_mastSum(d), 10] },
+  { id: 'omen1',   cat: 'ars',    name: 'Haruspicina',         desc: 'Fatti leggere un omen.',               reward: 3,  check: (d) => (d.stats.omens || 0) >= 1 },
+  { id: 'omen20',  cat: 'ars',    name: 'Extispicium',         desc: 'Leggi 20 omina.',                      reward: 8,  check: (d) => (d.stats.omens || 0) >= 20, prog: (d) => [d.stats.omens || 0, 20] },
+  { id: 'omendiv', cat: 'ars',    name: 'Signum divinum',      desc: 'Un omen Divinum.',                     reward: 10, check: (d) => _hasDivine(d) },
+  { id: 'chars',   cat: 'ars',    name: 'Locanda piena',       desc: 'Sblocca tutti i personaggi.',          reward: 10, check: (d) => Object.keys(CHARACTERS).every((c) => d.chars.indexOf(c) >= 0) },
+  // GLORIA
+  { id: 'lv30',    cat: 'gloria', name: 'Ascensio',            desc: 'Livello 30 in una discesa.',           reward: 5,  check: (d) => d.bestLevel >= 30, prog: (d) => [d.bestLevel, 30] },
+  { id: 'lv60',    cat: 'gloria', name: 'Apotheosis',          desc: 'Livello 60 in una discesa.',           reward: 12, check: (d) => d.bestLevel >= 60, prog: (d) => [d.bestLevel, 60] },
+  { id: 'coins200',cat: 'gloria', name: 'Thesaurus',           desc: '200 monete in carriera.',              reward: 10, check: (d) => d.totalCoins >= 200, prog: (d) => [d.totalCoins, 200] },
+  { id: 'hard',    cat: 'gloria', name: 'Nessuna pietà',       desc: 'Vinci a Difficile.',                   reward: 12, check: (d) => (d.stats.winsDiff.difficile || 0) + (d.stats.winsDiff.incubo || 0) >= 1 },
+  { id: 'night5',  cat: 'gloria', name: 'In tenebris',         desc: 'Resisti 5 minuti a Incubo.',           reward: 10, check: (d) => _maxRec(d, 'incubo') >= 300, prog: (d) => [Math.floor(_maxRec(d, 'incubo') / 60), 5] },
+  { id: 'night',   cat: 'gloria', name: 'Incubo',              desc: 'Vinci a Incubo.',                      reward: 25, check: (d) => (d.stats.winsDiff.incubo || 0) >= 1 },
+  { id: 'endless', cat: 'gloria', name: 'Oltre la fine',       desc: 'Infinita: minuto 15.',                 reward: 10, check: (d) => d.stats.endlessBest >= 900, prog: (d) => [Math.floor(d.stats.endlessBest / 60), 15] },
+  { id: 'endless30',cat: 'gloria',name: 'Aeternitas',          desc: 'Infinita: minuto 30.',                 reward: 20, check: (d) => d.stats.endlessBest >= 1800, prog: (d) => [Math.floor(d.stats.endlessBest / 60), 30] },
 ];
+
+// MAGISTER — studia le passive: ogni grado = +20% all'effetto per livello (permanente)
+const MASTERY = { max: 3, bonus: 0.2, costs: [8, 15, 25], exclude: ['amount'] };
+
+// ARUSPICE — omina: bonus casuali su armi e armature (2 per oggetto). Le armi contano solo se equipaggiate.
+// rarità: 0 Vulgare, 1 Rarum, 2 Divinum
+const OMENS = {
+  slots: 2,
+  read: [5, 9],          // costo per leggere il 1° e il 2° omen di un oggetto
+  reroll: 4,             // costo per rileggere un omen
+  rarity: [
+    { name: 'Vulgare', w: 70, m: 1.0, col: '#a49dbd' },
+    { name: 'Rarum',   w: 24, m: 1.7, col: '#4fb3bd' },
+    { name: 'Divinum', w: 6,  m: 2.6, col: '#d1a93a' },
+  ],
+  // on: 'w' armi, 'a' armature, '*' entrambi
+  kinds: {
+    dmg:    { name: 'Ira',        on: 'w', base: 0.04,  fmt: (v) => '+' + Math.round(v * 100) + '% danno' },
+    cd:     { name: 'Celeritas',  on: 'w', base: 0.03,  fmt: (v) => '-' + Math.round(v * 100) + '% ricarica' },
+    area:   { name: 'Amplitudo',  on: 'w', base: 0.05,  fmt: (v) => '+' + Math.round(v * 100) + '% area' },
+    hp:     { name: 'Robur',      on: 'a', base: 8,     int: true, fmt: (v) => '+' + v + ' vita' },
+    regen:  { name: 'Salus',      on: 'a', base: 0.12,  fmt: (v) => '+' + v.toFixed(2) + ' vita/s' },
+    speed:  { name: 'Pernicitas', on: 'a', base: 0.03,  fmt: (v) => '+' + Math.round(v * 100) + '% velocità' },
+    armor:  { name: 'Firmitas',   on: 'a', base: 0.6,   int: true, fmt: (v) => '-' + v + ' danno subito' },
+    dodge:  { name: 'Caligo',     on: 'a', base: 0.012, fmt: (v) => '+' + (v * 100).toFixed(1) + '% schivata' },
+    magnet: { name: 'Attractio',  on: '*', base: 0.08,  fmt: (v) => '+' + Math.round(v * 100) + '% magnete' },
+    xp:     { name: 'Doctrina',   on: '*', base: 0.04,  fmt: (v) => '+' + Math.round(v * 100) + '% esperienza' },
+    coin:   { name: 'Pecunia',    on: '*', base: 0.08,  fmt: (v) => '+' + Math.round(v * 100) + '% monete' },
+  },
+};
+
+// sostituisce il primo numero di una descrizione ("+10% danno") con il valore moltiplicato
+function scaleDesc(desc, mult) {
+  if (!mult || mult === 1) return desc;
+  return desc.replace(/(\d+(?:\.\d+)?)/, (m) => { const v = parseFloat(m) * mult; return String(Math.round(v * 100) / 100); });
+}
 
 // PERSONAGGI — arma di partenza + un'abilità unica
 // dodge = probabilità di schivare un colpo | xp = bonus esperienza | regen = vita/s | area = bonus area armi
 const CHARACTERS = {
   eek:        { name: 'Eek',          sprite: 'hi_eek',         weapon: 'dart', price: 0,  hp: 0,   speed: 0.03,  dmg: 0,    dodge: 0.12, xp: 0,    regen: 0,   area: 0,
                 anim: 'hi_eek', kunai: true,
-                desc: 'Mezzo ninja. Kunai. Schiva il 12% dei colpi.' },
+                desc: 'Kunai · schivata 12%' },
   alchimista: { name: 'Virgilio',     sprite: 'player',         weapon: 'dart', price: 1,  hp: 0,   speed: 0,     dmg: 0,    dodge: 0,    xp: 0.15, regen: 0,   area: 0,
-                desc: '"Tu se\' lo mio maestro". Sagitta. Abilità: +15% esperienza.' },
+                desc: '"Tu se\' lo mio maestro e \'l mio autore." · Sagitta · +15% esperienza' },
   badessa:    { name: 'Beatrice',     sprite: 'char_badessa',   weapon: 'aura', price: 15, hp: 20,  speed: -0.05, dmg: 0,    dodge: 0,    xp: 0,    regen: 0.3, area: 0,
-                desc: 'Primo Cerchio. Abilità: +20 vita e rigenera 0.3/s. -5% velocità.' },
+                desc: '"Amor mi mosse, che mi fa parlare." · Limbus · +20 vita, +0.3 vita/s, -5% velocità' },
   fuochista:  { name: 'Farinata',     sprite: 'char_fuochista', weapon: 'bomb', price: 20, hp: -10, speed: 0,     dmg: 0.10, dodge: 0,    xp: 0,    regen: 0,   area: 0.15,
-                desc: 'L\'eretico nella tomba di fuoco. Ignis. Abilità: +10% danno, +15% area. -10 vita.' },
+                desc: '"Ed el s\'ergea col petto e con la fronte." · Ignis · +10% danno, +15% area, -10 vita' },
 };
 
 // ----------------------------------------------------------------------------
@@ -1543,23 +1649,23 @@ const CHARACTERS = {
 // ----------------------------------------------------------------------------
 const MAPS = {
   cripta:     { name: 'La Cripta', short: 'Cripta',                 floor: 'cripta',     props: ['pl_tuft', 'pl_sprout', 'pl_leaves', 'pl_fern'], obstacle: 'o_col_half', obstacles: 1, obsR: 11, layout: 'ruins', temple: 0.2, stoa: 0.22,
-                hp: 1.0, dmg: 1.0, coin: 1.0, unlock: null,     spitter: 1.0, swarm: 1.0, desc: 'Le rovine di una città antica: colonne spezzate e templi a metà. Qui è dove tutto comincia.' },
+                hp: 1.0, dmg: 1.0, coin: 1.0, unlock: null,     spitter: 1.0, swarm: 1.0, desc: '"Per me si va ne la città dolente."' },
   palude:     { name: 'La Palude Marcia', short: 'Palude',          floor: 'palude',     props: ['pl_reed', 'pl_tuft', 'pl_bush', 'pl_fern'], obstacle: 'o_tree',     obstacles: 3, obsR: 16,
                 hp: 1.25, dmg: 1.12, coin: 1.25, unlock: 'cripta', spitter: 1.0, swarm: 1.6, special: 'toxic', specialShare: 0.16,
-                desc: 'Fango, alberi morti, sciami di gocce e Slime Velenosi che lasciano pozze tossiche.' },
+                desc: '"Fitti nel limo dicon: Tristi fummo."' },
   cattedrale: { name: 'La Cattedrale Sconsacrata', short: 'Cattedrale', floor: 'cattedrale', props: ['pl_sprout', 'pl_tuft', 'pl_leaves'],  obstacle: 'o_col',      obstacles: 4, obsR: 11, layout: 'ruins', temple: 0.32, stoa: 0.25,
                 hp: 1.5, dmg: 1.35, coin: 1.5, unlock: 'palude', spitter: 2.0, swarm: 1.2, special: 'ghost', specialShare: 0.22,
-                desc: 'Templi crollati di una città sconsacrata. Sputacchini ovunque e Spettri che passano attraverso i muri.' },
+                desc: '"Suo cimitero da questa parte hanno con Epicuro tutti suoi seguaci."' },
   // CAMPAGNE DELL'INFERNO (dopo la Cattedrale si scende)
   selva:      { name: 'La Selva Oscura', short: 'Selva', floor: 'selva', props: ['pl_fern', 'pl_bush', 'pl_tuft'], obstacle: 'o_oak', obstacles: 5, obsR: 16,
                 hp: 1.7, dmg: 1.45, coin: 1.75, unlock: 'cattedrale', spitter: 1.0, swarm: 1.3, special: 'lupa', specialShare: 0.2,
-                desc: '"Nel mezzo del cammin di nostra vita". Alberi fitti e Lupe che ti balzano addosso.' },
+                desc: '"Nel mezzo del cammin di nostra vita."' },
   dite:       { name: 'La Città di Dite', short: 'Dite', floor: 'dite', props: ['pl_dry_tuft', 'pl_dry_fern'], obstacle: 'o_sarc', obstacles: 3, obsR: 17,
                 hp: 1.95, dmg: 1.6, coin: 2.0, unlock: 'selva', spitter: 1.2, swarm: 1.0, special: 'furia', specialShare: 0.2,
-                desc: 'Mura di ferro e tombe infuocate. Le Furie lanciano fiammate a ventaglio.' },
+                desc: '"Ad ogne man grande campagna, piena di duolo e di tormento rio."' },
   cocito:     { name: 'Il Cocito', short: 'Cocito', floor: 'cocito', props: ['pl_ice_tuft', 'pl_ice_sprout'], obstacle: 'o_ice', obstacles: 4, obsR: 13,
                 hp: 2.25, dmg: 1.75, coin: 2.4, unlock: 'dite', spitter: 1.0, swarm: 1.5, special: 'gelido', specialShare: 0.22,
-                desc: 'Il lago ghiacciato in fondo all\'Inferno. I Traditori Gelidi ti congelano le gambe.' },
+                desc: '"Vexilla regis prodeunt inferni."' },
 };
 // BOSS DELLE MAPPE — minuto 7 (b2: fulmini su zone segnate) e minuto 10 (b3: raffiche di proiettili).
 // Stesse regole per tutte le mappe, ma ogni mappa ha i suoi due mostri danteschi.
@@ -1641,8 +1747,10 @@ const Save = {
       migr: 3,              // versione dei dati salvati
       gear: 'dagger',       // arma dell'Armaiolo che porti in partita
       shops: { weapons: 0, armor: 0, smith: 0 },   // livello delle botteghe
+      mastery: {},          // Magister: passiva -> grado (0..3)
+      omens: {},            // Aruspice: oggetto -> [omen|null, omen|null], omen = { k, v, r }
       quests: {},           // missioni riscosse: id -> true
-      stats: { kills: 0, bosses: {}, elites: 0, chests: 0, evos: 0, winsDiff: {}, endlessBest: 0 },
+      stats: { kills: 0, bosses: {}, elites: 0, chests: 0, evos: 0, winsDiff: {}, endlessBest: 0, omens: 0 },
       records: {},          // 'mappa/difficoltà' -> { t, k, lv, win, endless }
       tips: {},             // consigli già visti
       settings: { joy: 'float', shake: true, numbers: true, flash: true, sfx: true, vol: 'mid' }, // joy: 'float' | 'left' | 'right'
@@ -1663,6 +1771,9 @@ const Save = {
     d.stats.bosses = d.stats.bosses || {}; d.stats.winsDiff = d.stats.winsDiff || {};
     d.items = d.items || {}; d.wins = d.wins || {}; d.quests = d.quests || {}; d.records = d.records || {}; d.tips = d.tips || {};
     for (const id in d.items) if (!SHOP_ITEMS[id]) delete d.items[id];
+    d.mastery = d.mastery || {}; d.omens = d.omens || {};
+    for (const id in d.mastery) if (!PASSIVE_DEFS[id]) delete d.mastery[id];
+    for (const id in d.omens) if (!SHOP_ITEMS[id] || !Array.isArray(d.omens[id])) delete d.omens[id];
     if (!SHOP_ITEMS[d.gear] || !SHOP_ITEMS[d.gear].gear) d.gear = 'dagger';
     if (!Array.isArray(d.chars)) d.chars = ['eek'];
     // v1: l'Alchimista era gratis, ora si compra
@@ -1813,6 +1924,65 @@ const Save = {
     this.write();
     return 'fail';
   },
+  // ---- Magister --------------------------------------------------------------
+  masteryRank(id) { return (this.data && this.data.mastery[id]) || 0; },
+  masteryMult(id) { return MASTERY.exclude.indexOf(id) >= 0 ? 1 : 1 + MASTERY.bonus * this.masteryRank(id); },
+  masteryCost(id) { const r = this.masteryRank(id); return r < MASTERY.max ? MASTERY.costs[r] : 0; },
+  buyMastery(id) {
+    const c = this.masteryCost(id);
+    if (!c || MASTERY.exclude.indexOf(id) >= 0 || !this.spend(c)) return false;
+    this.data.mastery[id] = this.masteryRank(id) + 1;
+    this.write();
+    return true;
+  },
+
+  // ---- Aruspice --------------------------------------------------------------
+  omenList(id) { const o = this.data.omens[id]; return o || [null, null]; },
+  omenKinds(id) {
+    const want = SHOP_ITEMS[id].gear ? 'w' : 'a', out = [];
+    for (const k in OMENS.kinds) { const on = OMENS.kinds[k].on; if (on === want || on === '*') out.push(k); }
+    return out;
+  },
+  _rollOmen(id, avoid) {
+    let kinds = this.omenKinds(id).filter((k) => k !== avoid);
+    const k = kinds[(Math.random() * kinds.length) | 0];
+    let t = Math.random() * 100, r = 0;
+    for (; r < OMENS.rarity.length - 1; r++) { t -= OMENS.rarity[r].w; if (t < 0) break; }
+    const K = OMENS.kinds[k];
+    let v = K.base * OMENS.rarity[r].m * (0.8 + Math.random() * 0.4);
+    v = K.int ? Math.max(1, Math.round(v)) : Math.round(v * 1000) / 1000;
+    return { k, v, r };
+  },
+  omenReadCost(id) { const n = this.omenList(id).filter(Boolean).length; return n < OMENS.slots ? OMENS.read[n] : 0; },
+  // legge l'omen nel primo posto libero (slot < 0) oppure rilegge lo slot indicato
+  readOmen(id, slot) {
+    if (this.itemLevel(id) < 0) return null;
+    const list = this.omenList(id).slice();
+    if (slot < 0) slot = list.indexOf(null);
+    if (slot < 0 || slot >= OMENS.slots) return null;
+    const cost = list[slot] ? OMENS.reroll : this.omenReadCost(id);
+    if (!this.spend(cost)) return null;
+    const other = list[1 - slot];
+    list[slot] = this._rollOmen(id, other ? other.k : null);
+    this.data.omens[id] = list;
+    this.data.stats.omens = (this.data.stats.omens || 0) + 1;
+    this.write();
+    return list[slot];
+  },
+  // somma di un tipo di omen su tutto ciò che porti (armature possedute + arma equipaggiata)
+  omen(k) {
+    const d = this.data;
+    if (!d) return 0;
+    const gear = this.gearId();
+    let t = 0;
+    for (const id in d.omens) {
+      if (this.itemLevel(id) < 0) continue;
+      if (SHOP_ITEMS[id].gear && id !== gear) continue;
+      for (const o of d.omens[id]) if (o && o.k === k) t += o.v;
+    }
+    return t;
+  },
+
   buyChar(id) {
     if (this.data.chars.indexOf(id) >= 0 || !this.spend(CHARACTERS[id].price)) return false;
     this.data.chars.push(id); this.data.char = id; this.write();
@@ -2024,6 +2194,7 @@ const SFX_DEFS = {
   dodge:  { gap: 0.1,   fn: (s, t) => s.noise(t, 0.14, 0.09, 'bandpass', 1200, 4000, 1) },
   whip:   { gap: 0.06,  fn: (s, t) => { s.noise(t, 0.06, 0.16, 'highpass', 3500, 6000); s.tone(t, 'square', 1800, 600, 0.04, 0.03); } },
   storm:  { gap: 0.2,   fn: (s, t) => s.noise(t, 0.5, 0.1, 'bandpass', 300, 1200, 0.8) },
+  helix:  { gap: 0.2,   fn: (s, t) => { s.arp(t, 'triangle', [440, 712, 1152], 0.05, 0.12, 0.03); } },
   frost:  { gap: 0.15,  fn: (s, t) => { s.noise(t, 0.3, 0.12, 'highpass', 5000, 2500); s.arp(t, 'triangle', [1568, 2093, 2637], 0.04, 0.1, 0.035); } },
   // raccolta
   gem:    { gap: 0.03,  fn: (s, t) => {
@@ -2500,6 +2671,8 @@ const SPR = {
       if (kind === 'smith') { rect(10, 32, 17, 38, 'D'); for (let x = 10; x <= 17; x += 2) set(x, 37, 'P'); }   // fornace che brilla
       if (kind === 'armor') { rect(26, 31, 33, 38, 'y'); rect(27, 32, 32, 36, 'z'); rect(29, 33, 30, 35, 'D'); } // stemma sullo scudo
       if (kind === 'inn') { rect(24, 30, 35, 37, 'f'); rect(25, 31, 34, 36, 'h'); for (let x = 26; x <= 33; x += 2) set(x, 33, 'j'); } // insegna
+      if (kind === 'magister') { rect(24, 30, 35, 37, '9'); rect(25, 31, 34, 36, '8'); rect(29, 31, 30, 36, '5'); for (let x = 26; x <= 33; x += 2) if (x !== 30) set(x, 33, '6'); } // libro aperto
+      if (kind === 'haruspex') { rect(25, 30, 34, 37, 'B'); rect(26, 31, 33, 36, 'C'); rect(28, 32, 31, 35, 'D'); set(29, 33, 'P'); set(30, 34, 'P'); } // occhio rosso
       if (kind === 'weapons') { for (let k = 0; k < 3; k++) { rect(25 + k * 4, 31, 25 + k * 4, 37, '7'); set(25 + k * 4, 30, '9'); set(24 + k * 4, 36, 'f'); set(26 + k * 4, 36, 'f'); } } // spade incrociate
       this._register(name, g);
     };
@@ -2507,6 +2680,8 @@ const SPR = {
     house('h_weapons', ['z', 'y', 'x'], '5', 'weapons');
     house('h_armor',   ['e', 'd', 'c'], '5', 'armor');
     house('h_inn',     ['p', 'o', 'n'], '5', 'inn');
+    house('h_magister', ['u', 't', 's'], '5', 'magister');
+    house('h_haruspex', ['G', 'F', 'E'], '4', 'haruspex');
     // arredi
     this.fromRows('v_anvil', ['.777777777..', '78888888887.', '.777777777..', '...6666....', '...6666....', '..666666...', '.33333333..']);
     this.fromRows('v_rack', ['g.........g', 'g.9..9..9.g', 'gg7gg7gg7gg', 'g.7..7..7.g', 'g.7..7..7.g', 'g.7..7..7.g', 'g.f..f..f.g', 'g.f..f..f.g', 'g.........g', 'gg.......gg']);
@@ -2916,6 +3091,7 @@ const SPR = {
     this.fromRows('ico_storm', ['8888888', '.77777.', '..6666.', '..555..', '...44..', '...4...', '..4....']);
     this.fromRows('ico_beam', ['....L....', '.L..9..L.', '..L999L..', '..99w99..', 'LL9www9LL', '..99w99..', '..L999L..', '.L..9..L.', '....L....']);
     this.fromRows('ico_frost', ['...{.{...', '....]....', '.{..]..{.', '..{.].{..', ']]]]w]]]]', '..{.].{..', '.{..]..{.', '....]....', '...{.{...']);
+    this.fromRows('ico_helix', ['..LLLLL..', '.L.....L.', 'L..KKK..L', 'L.K...K.L', 'L.K.w.K.L', 'L.K..KK.L', 'L..K....L', '.L..KKKL.', '..L......']);
     this.fromRows('ico_area', ['7.......7', '.7.....7.', '..8...8..', '...999...', '...9w9...', '...999...', '..8...8..', '.7.....7.', '7.......7']);
     this.fromRows('ico_twins', ['.w....w.', 'w9w..w9w', '.w....w.', '.7....7.', '.777777.', '.7....7.', '.7....7.']);
     this.fromRows('ico_greed', ['..hhh..', '...h...', '.ggggg.', 'gggLggg', 'ggLLLgg', 'gggLggg', '.ggggg.']);
@@ -5219,6 +5395,38 @@ const Doll = {
     return this.finish(name, c, ['0', '1', '6', '7', '8', '9', 'S', '%', '&', 'v', 'a', 'b', 'c', 'd', 'K', 'C', '4', '5']);
   },
 
+  npcMagister(name, b) {   // MAGISTER: toga bianca col bordo porpora, barba lunga bianca, rotolo in mano
+    const { c, g } = this.canvas(34, 50);
+    const { sx, sy } = this._robe(g, b, { low: '8', lowD: '6', top: '9', topD: '7', obi: 'o', collar: 'p', collar2: '9' });
+    this.line(g, 'o', sx - 6, sy + 2, sx + 6, sy + 18, 1.6);                  // clavus porpora
+    this.line(g, 'h', sx + 4, sy + 11, sx + 11, sy + 11, 2.4);                // rotolo
+    this.ell(g, 'j', sx + 11, sy + 11, 1.3, 1.6);
+    this.ell(g, 'S', sx + 5, sy + 12, 1.7, 1.7);
+    const hx = sx + 1, hy = sy - 8;
+    this._head(g, hx, hy, {});
+    this.ell(g, '8', hx - 2, hy - 3.6, 4.4, 2.2);                             // capelli bianchi
+    this.poly(g, '9', [hx - 1.5, hy + 2, hx + 5, hy + 2.5, hx + 3, hy + 11, hx + 0.5, hy + 9]);   // barba lunga
+    this.line(g, '8', hx + 0.5, hy + 3, hx + 4.5, hy + 3.3, 0.8);
+    this.line(g, 'c', hx - 4.5, hy - 2.5, hx + 3.5, hy - 4, 1.2);             // corona d'alloro
+    return this.finish(name, c, ['0', '1', '5', '6', '7', '8', '9', 'S', '%', '&', 'o', 'p', 'h', 'j', 'c']);
+  },
+
+  npcHaruspex(name, b) {   // ARUSPICE: tunica scura e cappuccio rosso, mantello, coppa con le viscere
+    const { c, g } = this.canvas(34, 50);
+    const { sx, sy } = this._robe(g, b, { low: '2', lowD: '1', top: 'B', topD: 'A', obi: 'K', collar: 'C', collar2: '3' });
+    this.poly(g, 'A', [sx - 7, sy - 1, sx - 2, sy - 1, sx - 4, sy + 27, sx - 9, sy + 26]);   // mantello dietro
+    this.line(g, 'L', sx + 3, sy + 10, sx + 12, sy + 10, 1.4);                // coppa
+    this.poly(g, 'K', [sx + 5, sy + 6, sx + 11, sy + 6, sx + 10, sy + 10, sx + 6, sy + 10]);
+    this.ell(g, 'D', sx + 8, sy + 6, 2.2, 1.2);                               // fegato
+    this.ell(g, 'S', sx + 4, sy + 10.5, 1.7, 1.5);
+    const hx = sx + 1, hy = sy - 8;
+    this._head(g, hx, hy, {});
+    this.poly(g, 'C', [hx - 6, hy + 4, hx - 6, hy - 3, hx - 1, hy - 7.5, hx + 4, hy - 6, hx + 5.5, hy - 2, hx + 2, hy - 3, hx - 2, hy + 1, hx - 3, hy + 6]);   // cappuccio
+    this.line(g, 'B', hx - 5, hy + 3, hx - 1, hy - 6, 0.8);
+    this.line(g, '1', hx + 2.5, hy + 4, hx + 3.2, hy + 7, 1.1);               // barbetta scura
+    return this.finish(name, c, ['0', '1', '2', '3', '4', '5', 'S', '%', '&', 'A', 'B', 'C', 'D', 'K', 'L']);
+  },
+
   npcInn(name, b) {   // LOCANDIERA: kimono a strati (viola, rosso, oro), capelli neri lunghissimi, vassoio col tè
     const { c, g } = this.canvas(34, 50);
     // capelli lunghissimi dietro, fino a terra (stile Heian)
@@ -5250,7 +5458,7 @@ const Doll = {
       e.dashImg = SPR._silhouette(e.img, PAL.o); e.dashMir = SPR._silhouette(e.mir, PAL.o);
     }
     // abitanti del villaggio (2 fotogrammi di respiro)
-    for (const [n, f] of [['npc_smith', 'npcSmith'], ['npc_weapons', 'npcWeapons'], ['npc_armor', 'npcArmor'], ['npc_inn', 'npcInn']]) {
+    for (const [n, f] of [['npc_smith', 'npcSmith'], ['npc_weapons', 'npcWeapons'], ['npc_armor', 'npcArmor'], ['npc_inn', 'npcInn'], ['npc_magister', 'npcMagister'], ['npc_haruspex', 'npcHaruspex']]) {
       this[f](n, 0);
       this[f](n + '_b', 1);
     }
@@ -6600,22 +6808,22 @@ const Player = {
 
   // Statistiche finali = base * passive. Chiamata solo quando cambia qualcosa (non a ogni frame).
   recalcStats() {
-    const P = PASSIVE_DEFS, L = (id) => this.passiveLevel(id);
+    const P = PASSIVE_DEFS, L = (id) => this.passiveLevel(id) * Save.masteryMult(id), O = (k) => Save.omen(k);
     const oldMax = this.maxHp;
     const ch = CHARACTERS[Save.data.char] || CHARACTERS.eek;
     // passive della partita + oggetti del negozio + personaggio
-    this.dmgMult  = 1 + P.might.per * L('might') + ch.dmg;
-    this.speed    = CFG.player.speed * (1 + P.speed.per * L('speed') + Save.itemValue('boots') + ch.speed);
-    this.maxHp    = CFG.player.hp + P.maxhp.per * L('maxhp') + Save.itemValue('necklace') + ch.hp;
-    this.armor    = Save.itemValue('shield') + P.armor.per * L('armor');
-    this.regen    = P.regen.per * L('regen') + (ch.regen || 0);
-    this.magnet   = CFG.player.magnet * (1 + P.magnet.per * L('magnet'));
-    this.xpMult   = 1 + P.xp.per * L('xp') + (ch.xp || 0) + Save.itemValue('ring');
-    this.cdMult   = Math.max(0.4, 1 - P.cooldown.per * L('cooldown'));
-    this.areaMult = 1 + (ch.area || 0) + P.area.per * L('area');
+    this.dmgMult  = 1 + P.might.per * L('might') + ch.dmg + O('dmg');
+    this.speed    = CFG.player.speed * (1 + P.speed.per * L('speed') + Save.itemValue('boots') + ch.speed + O('speed'));
+    this.maxHp    = CFG.player.hp + P.maxhp.per * L('maxhp') + Save.itemValue('necklace') + ch.hp + O('hp');
+    this.armor    = Save.itemValue('shield') + P.armor.per * L('armor') + O('armor');
+    this.regen    = P.regen.per * L('regen') + (ch.regen || 0) + O('regen');
+    this.magnet   = CFG.player.magnet * (1 + P.magnet.per * L('magnet') + O('magnet'));
+    this.xpMult   = 1 + P.xp.per * L('xp') + (ch.xp || 0) + Save.itemValue('ring') + O('xp');
+    this.cdMult   = Math.max(0.4, 1 - P.cooldown.per * L('cooldown') - O('cd'));
+    this.areaMult = 1 + (ch.area || 0) + P.area.per * L('area') + O('area');
     this.amount   = P.amount.per * L('amount');
-    this.dodge    = (ch.dodge || 0) + Save.itemValue('cloak');
-    this.coinMult = 1 + P.greed.per * L('greed');
+    this.dodge    = Math.min(0.6, (ch.dodge || 0) + Save.itemValue('cloak') + O('dodge'));
+    this.coinMult = 1 + P.greed.per * L('greed') + O('coin');
     if (this.maxHp > oldMax && oldMax > 0) this.hp += this.maxHp - oldMax; // la vita guadagnata si riempie subito
   },
 
@@ -7181,8 +7389,8 @@ function updateNight() {
   if (t >= NIGHT.start) night = ((t - NIGHT.start) % NIGHT.cycle) >= NIGHT.cycle - NIGHT.nightLen;
   if (night !== G.night) {
     G.night = night;
-    if (night) { UI.toast('Avviso di sistema', 'È calata la notte. Gli slime diventano demoni...', 4); Sfx.play('night'); }
-    else UI.toast('Avviso di sistema', "L'alba. I demoni tornano slime.", 3);
+    if (night) { UI.toast('Nox', '"Lo giorno se n\'andava, e l\'aere bruno..."', 4); Sfx.play('night'); }
+    else UI.toast('Aurora', '"Dolce color d\'orïental zaffiro."', 3);
   }
 }
 
@@ -7383,8 +7591,8 @@ function updateEShots(dt) {
 // (o dell'evoluzione).
 // ============================================================================
 
-const PK = { SALT: 0, BOMB: 1, SCYTHE: 2, ACID: 3, WISP: 4, ARROW: 5, AXE: 6, STORM: 7 };
-const PROJ_SPRITE = ['proj_salt', 'bomb', 'proj_scythe', 'flask', 'wisp', 'proj_arrow', 'proj_axe', null];
+const PK = { SALT: 0, BOMB: 1, SCYTHE: 2, ACID: 3, WISP: 4, ARROW: 5, AXE: 6, STORM: 7, HELIX: 8 };
+const PROJ_SPRITE = ['proj_salt', 'bomb', 'proj_scythe', 'flask', 'wisp', 'proj_arrow', 'proj_axe', null, null];
 
 const QBUF_ORB = new Int32Array(512);
 
@@ -7834,6 +8042,23 @@ const WEAPON_LOGIC = {
     if (Boss.active && E.alive[Boss.idx] !== 0 && hit(Boss.idx, E.r[Boss.idx] * 0.8)) damageEnemy(Boss.idx, dmg, 0, 0, 0);
   },
 
+  // Vite Aerea: `amount` lame a raggiera che si avvitano verso l'esterno (evoluta: metà gira al contrario).
+  helix(w, dt) {
+    w.timer -= dt;
+    if (w.timer > 0) return;
+    const st = wStats(w);
+    w.timer = st.cd * Player.cdMult;
+    const n = amt(st), a0 = Math.random() * 6.2832, D = w.def, sz = st.size * Player.areaMult;
+    for (let k = 0; k < n; k++) {
+      const a = a0 + k / n * 6.2832, dir = st.twin && (k & 1) ? -1 : 1;
+      const i = spawnProjectile(PK.HELIX, Player.x + Math.cos(a) * D.r0, Player.y + Math.sin(a) * D.r0, Math.cos(a), Math.sin(a), 0, st.dmg * Player.dmgMult, sz, sz, 6, 999, st.kb);
+      if (i < 0) break;
+      const P = Projectiles;
+      P.tgt[i] = a; P.aoe[i] = a; P.split[i] = st.speed * dir; P.vx[i] = st.reach * Player.areaMult; P.vy[i] = 0;
+    }
+    Sfx.play('helix');
+  },
+
   // Gelo: `amount` onde di ghiaccio, una ogni `gap` secondi.
   frost(w, dt) {
     const st = wStats(w);
@@ -7959,6 +8184,15 @@ function updateProjectiles(dt) {
         if (d < 18) { P.alive[i] = 0; continue; }
       }
       if (P.life[i] <= -1.5) { P.alive[i] = 0; continue; }
+    } else if (kind === PK.HELIX) {
+      const D = WEAPON_DEFS.helix, sp = P.split[i], dir = sp < 0 ? -1 : 1;
+      let r = D.r0 * Math.pow(D.phi, Math.abs(P.tgt[i] - P.aoe[i]) * 0.63662);
+      P.tgt[i] += dir * Math.abs(sp) * dt / Math.max(r, D.r0) * 0.95;
+      r = D.r0 * Math.pow(D.phi, Math.abs(P.tgt[i] - P.aoe[i]) * 0.63662);
+      const ca = Math.cos(P.tgt[i]), sa = Math.sin(P.tgt[i]);
+      P.x[i] = Player.x + ca * r; P.y[i] = Player.y + sa * r;
+      P.dx[i] = ca; P.dy[i] = sa;
+      if (r > P.vx[i]) { P.alive[i] = 0; continue; }
     } else if (kind === PK.WISP) {
       // ogni 0.15 s cerca lo slime più vicino e curva verso di lui
       P.aoe[i] -= dt;
@@ -8081,8 +8315,8 @@ const Upgrades = {
       // quali armi fa evolvere questa passiva (il suggerimento lo prometteva, ma mancava)
       const evos = [];
       for (const id in WEAPON_DEFS) { const wd = WEAPON_DEFS[id]; if (wd.evo && wd.evo.passive === o.id) evos.push(wd.name); }
-      const hint = evos.length ? ' Fa evolvere: ' + evos.join(', ') + ' (Lv 5).' : '';
-      return { name: d.name, icon: d.icon, badge: lv ? 'Lv ' + lv + ' → ' + (lv + 1) : 'NUOVA PASSIVA', desc: d.desc + '.' + hint, kind: 'Passiva' };
+      const hint = evos.length ? ' → ' + evos.join(', ') : '';
+      return { name: d.name, icon: d.icon, badge: lv ? 'Lv ' + lv + ' → ' + (lv + 1) : 'NUOVA PASSIVA', desc: scaleDesc(d.desc, Save.masteryMult(o.id)) + hint, kind: 'Passiva' };
     }
     const f = FILLER_CARDS[o.id];
     return { name: f.name, icon: f.icon, badge: 'BONUS', desc: f.desc, kind: 'Bonus' };
@@ -8580,6 +8814,35 @@ const Render = {
         ctx.drawImage(wsp.img, sx - (wsp.w >> 1), sy - (wsp.h >> 1) - (((rt * 10 + i) | 0) & 1));
       }
     }
+    // Vite Aerea: scia dorata lungo la spirale (punteggiata) + elica a due pale che gira
+    for (let i = 0; i < P.count; i++) {
+      if (P.alive[i] === 0 || P.kind[i] !== PK.HELIX) continue;
+      const x = P.px[i] * ia + P.x[i] * alpha, y = P.py[i] * ia + P.y[i] * alpha;
+      if (x < L || x > R || y < T || y > B) continue;
+      const sx = Math.round(x * S) + ox, sy = Math.round(y * S) + oy, D = WEAPON_DEFS.helix;
+      const dir = P.split[i] < 0 ? -1 : 1, th = P.tgt[i], th0 = P.aoe[i];
+      const hx = sx - Math.round((Player.px * ia + Player.x * alpha) * S) - ox, hy = sy - Math.round((Player.py * ia + Player.y * alpha) * S) - oy;
+      const rh = Math.sqrt(hx * hx + hy * hy) || 1, stepA = 3 / rh; // un puntino ogni ~3 px di spirale
+      for (let q = 1; q <= 12; q++) {
+        const tq = th - dir * q * stepA;
+        if ((tq - th0) * dir < 0) break;
+        if (q > 6 && (q & 1)) continue;
+        const rq = D.r0 * Math.pow(D.phi, Math.abs(tq - th0) * 0.63662) * S;
+        ctx.fillStyle = q < 4 ? PAL.L : q < 8 ? PAL.K : PAL.h;
+        ctx.fillRect(sx - hx + Math.round(Math.cos(tq) * rq), sy - hy + Math.round(Math.sin(tq) * rq), q < 4 ? 2 : 1, q < 4 ? 2 : 1);
+      }
+      // elica: due pale con contorno nero, mozzo bianco
+      const l = Math.max(3, Math.round(P.size[i] * S * 0.9)), spin = rt * 22 * dir + i;
+      const bx = Math.cos(spin), by = Math.sin(spin) * 0.6;
+      ctx.fillStyle = PAL.k;
+      for (let q = -l - 1; q <= l + 1; q++) ctx.fillRect(sx + Math.round(bx * q) - 1, sy + Math.round(by * q) - 1, 3, 3);
+      for (let q = -l; q <= l; q++) {
+        ctx.fillStyle = Math.abs(q) >= l - 1 ? PAL.w : (q > 0 ? PAL.L : PAL.K);
+        ctx.fillRect(sx + Math.round(bx * q), sy + Math.round(by * q), 1, 2);
+      }
+      ctx.fillStyle = PAL.w; ctx.fillRect(sx, sy, 1, 1);
+    }
+
     // turbini della Bufera: anelli di vento che girano, più larghi in alto, con le anime trascinate
     for (let i = 0; i < P.count; i++) {
       if (P.alive[i] === 0 || P.kind[i] !== PK.STORM) continue;
@@ -8790,6 +9053,19 @@ const Render = {
       ctx.fillRect(0, 0, W, e); ctx.fillRect(0, H - e, W, e); ctx.fillRect(0, e, e, H - 2 * e); ctx.fillRect(W - e, e, e, H - 2 * e);
     }
 
+    // BUSSOLA: frecce ai bordi verso il boss e i forzieri che non si vedono
+    if (G.scene === 'run' && (G.state === 'play' || G.state === 'paused')) {
+      if (Boss.active && Enemies.alive[Boss.idx] !== 0) {
+        const bi = Boss.idx;
+        this.pointer(Math.round((Enemies.px[bi] * ia + Enemies.x[bi] * alpha) * S) + ox, Math.round((Enemies.py[bi] * ia + Enemies.y[bi] * alpha) * S) + oy, PAL.H, PAL.I, rt, 1);
+      }
+      const Gm = Gems;
+      for (let i = 0, shown = 0; i < Gm.count && shown < 3; i++) {
+        if (Gm.alive[i] === 0 || Gm.kind[i] !== GK.CHEST) continue;
+        if (this.pointer(Math.round(Gm.x[i] * S) + ox, Math.round(Gm.y[i] * S) + oy, PAL.O, PAL.Y, rt, 0)) shown++;
+      }
+    }
+
     // vita bassa: bordi rossi che pulsano
     if (Player.hp < Player.maxHp * 0.3 && G.state === 'play') {
       const pulse = 0.35 + 0.35 * Math.sin(rt * 7);
@@ -8851,6 +9127,28 @@ const Render = {
   },
 
   // Il boss: enorme, nero. Durante il preavviso lampeggia rosso scuro e mostra la traiettoria.
+  // Freccia sul bordo dello schermo verso (tx, ty) in pixel schermo; non fa nulla se il punto si vede.
+  // Ritorna true se l'ha disegnata. big = 1 per il boss (più grande, pulsa più forte).
+  pointer(tx, ty, col, hi, rt, big) {
+    const ctx = this.ctx, W = this.W, H = this.H, m = 10;
+    // in alto ci sono la barra XP e (col boss) la sua barra vita: le frecce restano sotto
+    const css = Boss.active ? (innerWidth <= 600 ? 140 : 86) : 40, mt = Math.ceil(css * H / (innerHeight || H));
+    if (tx > m && tx < W - m && ty > mt && ty < H - m) return false;
+    const cx = W >> 1, cy = (H + mt - m) >> 1, dx = tx - cx, dy = ty - cy;
+    const k = Math.min((cx - m) / (Math.abs(dx) || 1e-3), (dy < 0 ? cy - mt : H - m - cy) / (Math.abs(dy) || 1e-3));
+    const d = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / d, uy = dy / d;
+    const bob = (((rt * (big ? 6 : 3)) | 0) & 1);
+    const px = cx + dx * k - ux * bob, py = cy + dy * k - uy * bob, len = big ? 12 : 9;
+    for (let pass = 0; pass < 2; pass++) {
+      for (let q = 0; q <= len; q++) {
+        const hw = (len - q) * 0.62 + (pass ? 0 : 1), x0 = px + ux * (q - len * 0.5), y0 = py + uy * (q - len * 0.5);
+        ctx.fillStyle = pass === 0 ? PAL.k : (q >= len - 1 || bob ? hi : col);
+        for (let s = -Math.ceil(hw); s <= Math.ceil(hw); s++) ctx.fillRect(Math.round(x0 - uy * s), Math.round(y0 + ux * s), 1, 1);
+      }
+    }
+    return true;
+  },
+
   drawBoss(alpha, rt) {
     const E = Enemies, ctx = this.ctx, S = 1 / CFG.UNIT, ia = 1 - alpha;
     for (let i = 0; i < E.count; i++) {
@@ -9053,7 +9351,7 @@ const UI = {
   refreshMenu() {
     const d = Save.data, cur = d.difficulty;
     document.querySelectorAll('#diffs .btn').forEach((el) => el.classList.toggle('on', el.dataset.diff === cur));
-    $('diff-desc').textContent = DIFFICULTY[cur].desc.replace(/\s*Monete x\d+\.?$/, '');
+    $('diff-desc').textContent = DIFFICULTY[cur].desc.replace(/\s*·?\s*Monete x\d+\.?$/, '');
     $('menu-coins').textContent = d.coins;
     $('menu-stones').textContent = d.stones || 0;
     // personaggio (Eek respira: due fotogrammi, vedi tickMenu)
@@ -9088,13 +9386,13 @@ const UI = {
     $('map-name').textContent = m.name;
     $('map-lock').textContent = open ? '' : '🔒 Vinci ' + MAPS[m.unlock].name + ' per entrare';
     $('map-count').textContent = (ids.indexOf(id) + 1) + ' / ' + ids.length;
-    $('map-desc').textContent = m.desc + (open && m.b2 ? ' Al minuto 7 arriva ' + m.b2.name + ', al 10 ' + m.b3.name + '.' : '');
+    $('map-desc').textContent = m.desc + (open && m.b2 ? ' — VII ' + m.b2.name + ' · X ' + m.b3.name : '');
     // etichette: vinta, record, forza degli slime, monete
     const tags = [];
     if (d.wins[id]) tags.push(['won', '✓ vinta']);
     const rec = d.records[id + '/' + d.difficulty];
     if (open && rec && rec.t > 0) tags.push(['rec', 'record ' + fmtTime(rec.endless || rec.t)]);
-    if (m.hp > 1) tags.push(['danger', 'slime x' + m.hp]);
+    if (m.hp > 1) tags.push(['danger', 'hostes x' + m.hp]);
     if (m.coin > 1) tags.push(['coin', 'monete x' + m.coin]);
     if (!tags.length) tags.push(['', 'la prima discesa']);
     const tb = $('map-tags');
@@ -9184,7 +9482,7 @@ const UI = {
     }
     txt += '\nCARRIERA\n========\n';
     txt += pad('Partite giocate', 22) + d.runs + '\n';
-    txt += pad('Slime eliminati', 22) + st.kills.toLocaleString('it-IT') + '\n';
+    txt += pad('Dannati uccisi', 22) + st.kills.toLocaleString('it-IT') + '\n';
     txt += pad('Cacciatori eliminati', 22) + st.elites + '\n';
     txt += pad('Boss sconfitti', 22) + Object.keys(st.bosses).reduce((n, k) => n + st.bosses[k], 0) + '\n';
     txt += pad('Forzieri aperti', 22) + st.chests + '\n';
@@ -9299,11 +9597,13 @@ const UI = {
   shopReturn: 'village',
   _shopInit: false,
   VENDORS: {
-    weapons: { tab: 'items', title: "Bottega dell'Armaiolo", ico: 'it_dagger',  say: '"Lame per chi scende tra gli slime."' },
-    armor:   { tab: 'items', title: 'Bottega del Corazzaio', ico: 'it_shield',  say: '"Scudi, scarpe, collane e altro. Roba che ti tiene in vita."' },
-    smith:   { tab: 'smith', title: 'Fucina del Fabbro',     ico: 'ico_anvil',  say: '"Porta qui la tua roba, la rendo più forte. Ma il ferro a volte si incrina."' },
-    inn:     { tab: 'chars', title: 'Locanda',               ico: 'ico_mug',    say: '"Qui si fermano gli avventurieri. Chi vuoi essere stanotte?"' },
-    board:   { tab: 'quests', title: 'Bacheca delle missioni', ico: 'board',    say: 'Lavori per avventurieri.' },
+    weapons:  { tab: 'items',   title: "Bottega dell'Armaiolo",  ico: 'it_dagger',  say: '"Arma virumque cano."' },
+    armor:    { tab: 'items',   title: 'Bottega del Corazzaio',  ico: 'it_shield',  say: '"Si vis pacem, para bellum."' },
+    smith:    { tab: 'smith',   title: 'Fucina del Fabbro',      ico: 'ico_anvil',  say: '"Labor omnia vincit improbus."' },
+    inn:      { tab: 'chars',   title: 'Locanda',                ico: 'ico_mug',    say: '"Fatti non foste a viver come bruti."' },
+    board:    { tab: 'quests',  title: 'Tabula',                 ico: 'board',      say: '"Fortes fortuna adiuvat."' },
+    magister: { tab: 'mastery', title: 'Schola del Magister',    ico: 'ico_book',   say: '"Nulla dies sine linea."' },
+    haruspex: { tab: 'omens',   title: "Templum dell'Aruspice",  ico: 'ico_greed',  say: '"Alea iacta est."' },
   },
 
   closeShop() {
@@ -9356,7 +9656,18 @@ const UI = {
       }
       h = this.shopUpBar(this.shopVendor) + h;
     } else if (this.shopTab === 'quests') {
+      // linguette delle categorie (con il numero di missioni da riscuotere)
+      if (!QUEST_CATS[this.questCat]) this.questCat = 'caedes';
+      let tabs = '<div class="qcats">';
+      for (const c in QUEST_CATS) {
+        let ready = 0, tot = 0, got = 0;
+        for (const q of QUESTS) if (q.cat === c) { tot++; if (d.quests[q.id]) got++; else if (q.check(d)) ready++; }
+        tabs += '<button class="tab' + (c === this.questCat ? ' on' : '') + '" data-buy="qcat" data-id="' + c + '">' + QUEST_CATS[c].name +
+          ' <small>' + got + '/' + tot + '</small>' + (ready ? '<i class="qdot">' + ready + '</i>' : '') + '</button>';
+      }
+      h += tabs + '</div>';
       for (const q of QUESTS) {
+        if (q.cat !== this.questCat) continue;
         const claimed = !!d.quests[q.id], done = !claimed && q.check(d);
         let prog = '';
         if (!claimed && !done && q.prog) { const pr = q.prog(d); prog = ' (' + Math.min(pr[0], pr[1]).toLocaleString('it-IT') + ' / ' + pr[1].toLocaleString('it-IT') + ')'; }
@@ -9366,6 +9677,43 @@ const UI = {
                    : done ? '<button class="btn default" data-buy="quest" data-id="' + q.id + '">Riscuoti ' + this.price(q.reward) + '</button>'
                           : '<button class="btn" disabled>' + this.price(q.reward) + '</button>') + '</div>';
       }
+    } else if (this.shopTab === 'mastery') {
+      for (const id in PASSIVE_DEFS) {
+        if (MASTERY.exclude.indexOf(id) >= 0) continue;
+        const p = PASSIVE_DEFS[id], r = Save.masteryRank(id), max = r >= MASTERY.max, cost = Save.masteryCost(id);
+        let pips = '';
+        for (let k = 0; k < MASTERY.max; k++) pips += '<i class="' + (k < r ? 'on' : '') + '"></i>';
+        const now = scaleDesc(p.desc, Save.masteryMult(id)), next = scaleDesc(p.desc, 1 + MASTERY.bonus * (r + 1));
+        h += '<div class="srow"><div class="simg sunken"><img src="' + SPR.url[p.icon] + '"></div>' +
+          '<div><span class="sname">' + p.name + '</span> <span class="uppips">' + pips + '</span>' +
+          '<div class="sdesc">' + now + (max ? '' : ' → ' + (next.match(/[+-]?\d+(?:\.\d+)?%?/) || [''])[0]) + '</div></div>' +
+          (max ? '<button class="btn" disabled>Perfecta</button>'
+               : '<button class="btn" data-buy="mastery" data-id="' + id + '"' + (d.coins < cost ? ' disabled' : '') + '>Studia ' + this.price(cost) + '</button>') + '</div>';
+      }
+    } else if (this.shopTab === 'omens') {
+      let any = false;
+      const gear = Save.gearId();
+      for (const id in SHOP_ITEMS) {
+        const it = SHOP_ITEMS[id], L = Save.itemLevel(id);
+        if (L < 0) continue;
+        any = true;
+        const list = Save.omenList(id), off = it.gear && id !== gear;
+        let lines = '';
+        for (let k = 0; k < OMENS.slots; k++) {
+          const o = list[k];
+          if (o) {
+            const R = OMENS.rarity[o.r], K = OMENS.kinds[o.k];
+            lines += '<div class="omen"><span style="color:' + R.col + '"><b>' + K.name + '</b> ' + K.fmt(o.v) + '</span>' +
+              '<button class="btn mini" data-buy="omen" data-id="' + id + ':' + k + '"' + (d.coins < OMENS.reroll ? ' disabled' : '') + '>↻ ' + this.price(OMENS.reroll) + '</button></div>';
+          } else {
+            const first = list.indexOf(null) === k, cost = Save.omenReadCost(id);
+            lines += '<div class="omen empty"><span>· · ·</span>' + (first ? '<button class="btn mini" data-buy="omen" data-id="' + id + ':' + k + '"' + (d.coins < cost ? ' disabled' : '') + '>Leggi ' + this.price(cost) + '</button>' : '') + '</div>';
+          }
+        }
+        h += '<div class="srow orow' + (off ? ' off' : '') + '"><div class="simg sunken"><img src="' + SPR.url[SPR.itemIcon(id, L)] + '"></div>' +
+          '<div class="ocol"><span class="sname">' + it.name + '</span><span class="slv">+' + L + '</span>' + (off ? '<span class="slv">non equipaggiato</span>' : '') + lines + '</div></div>';
+      }
+      if (!any) h = '<div class="hint" style="padding:10px">"Nihil video."</div>';
     } else if (this.shopTab === 'smith') {
       let any = false;
       for (const id in SHOP_ITEMS) {
@@ -9405,6 +9753,7 @@ const UI = {
     if (us) us.addEventListener('click', () => { if ((Save.data.stones || 0) > 0) { this.useStone = !this.useStone; this.renderShop(); } });
   },
   useStone: false,
+  questCat: 'caedes',
 
   // barra "migliora bottega" in cima alla finestra del venditore
   shopUpBar(v) {
@@ -9432,6 +9781,17 @@ const UI = {
       this.shopMsg(SHOP_ITEMS[id].name + ' equipaggiato: lo porti nella prossima partita.', 'ok');
     } else if (kind === 'shopup') {
       if (Save.upgradeShop(id)) { Sfx.play('anvil'); this.shopMsg('Bottega migliorata! ' + SHOP_UPGRADES[id].unlocks[Save.shopLevel(id) - 1] + '.', 'ok'); }
+    } else if (kind === 'qcat') {
+      this.questCat = id;
+    } else if (kind === 'mastery') {
+      if (Save.buyMastery(id)) { Sfx.play('quest'); this.shopMsg(PASSIVE_DEFS[id].name + ' ' + 'I II III'.split(' ')[Save.masteryRank(id) - 1] + '.', 'ok'); }
+    } else if (kind === 'omen') {
+      const [item, sl] = id.split(':'), o = Save.readOmen(item, +sl);
+      if (o) {
+        const R = OMENS.rarity[o.r], K = OMENS.kinds[o.k];
+        Sfx.play(o.r === 2 ? 'quest' : 'buy');
+        this.shopMsg(R.name + ': ' + K.name + ' ' + K.fmt(o.v), o.r ? 'ok' : '');
+      }
     } else if (kind === 'quest') {
       const q = QUESTS.find((x) => x.id === id);
       if (Save.claimQuest(id)) { Sfx.play('quest'); this.shopMsg('Missione "' + q.name + '" riscossa: +' + q.reward + ' monete!', 'ok'); }
@@ -9760,13 +10120,15 @@ const TIPS = [
 
 const Village = {
   VS: 0.5,                           // pixel del villaggio per unità di mondo
-  W: 1100, H: 820,                   // dimensioni del villaggio
+  W: 1500, H: 820,                   // dimensioni del villaggio
   houseY: -170,                      // linea dei piedi delle case (porte)
   npcs: [
+    { id: 'magister', name: 'il Magister',  x: -625, house: 'h_magister', sprite: 'npc_magister', sign: 'ico_book' },
     { id: 'smith',   name: 'il Fabbro',     x: -375, house: 'h_smith',   sprite: 'npc_smith',   sign: 'ico_anvil', extra: 'v_anvil' },
     { id: 'weapons', name: "l'Armaiolo",    x: -125, house: 'h_weapons', sprite: 'npc_weapons', sign: 'it_dagger', extra: 'v_rack' },
     { id: 'armor',   name: 'il Corazzaio',  x: 125,  house: 'h_armor',   sprite: 'npc_armor',   sign: 'it_shield' },
     { id: 'inn',     name: 'la Locandiera', x: 375,  house: 'h_inn',     sprite: 'npc_inn',     sign: 'ico_mug',   extra: 'v_barrel' },
+    { id: 'haruspex', name: "l'Aruspice",   x: 625,  house: 'h_haruspex', sprite: 'npc_haruspex', sign: 'ico_greed' },
     { id: 'board',   name: 'la Bacheca',    x: -290, y: -40, sprite: 'board', verb: 'Leggi' },
   ],
   well: { x: 0, y: -70, r: 26 },
@@ -9823,7 +10185,7 @@ const Village = {
       add('g_tree', side * 140, 250); CI.push([side * 140, 242, 14]);
     }
     // alberi scuri attorno al villaggio
-    for (const [x, y] of [[-520, -340], [-520, -100], [-520, 150], [-520, 380], [520, -340], [520, -100], [520, 150], [520, 380], [-300, 400], [300, 400], [-180, 400], [180, 400]]) {
+    for (const [x, y] of [[-720, -340], [-720, -100], [-720, 150], [-720, 380], [720, -340], [720, -100], [720, 150], [720, 380], [-560, 220], [560, 220], [-600, 400], [600, 400], [-300, 400], [300, 400], [-180, 400], [180, 400]]) {
       add('o_oak', x, y); CI.push([x, y - 6, 16]);
     }
   },
@@ -9922,10 +10284,10 @@ const Village = {
     // fuori dal villaggio: buio; poi erba, piazza, sentiero, terra dei giardini
     ctx.fillStyle = '#030305'; ctx.fillRect(0, 0, VW, VH);
     fillW(R.floorPats.village, -this.W / 2, -this.H / 2, this.W / 2, this.H / 2);
-    fillW(R.floorPats.plaza, -480, -185, 480, 20);
+    fillW(R.floorPats.plaza, -720, -185, 720, 20);
     fillW(R.floorPats.plaza, -40, 20, 40, 330);
     ctx.fillStyle = '#1c1925';
-    ctx.fillRect(X(-480), Y(-185), Math.round(960 * S), 1); ctx.fillRect(X(-480), Y(20), Math.round(440 * S), 1); ctx.fillRect(X(40), Y(20), Math.round(440 * S), 1);
+    ctx.fillRect(X(-720), Y(-185), Math.round(1440 * S), 1); ctx.fillRect(X(-720), Y(20), Math.round(680 * S), 1); ctx.fillRect(X(40), Y(20), Math.round(680 * S), 1);
     // bordo del villaggio che sfuma nel buio
     ctx.fillStyle = R.pat(PAL.k);
     const bx0 = X(-this.W / 2), by0 = Y(-this.H / 2), bw = Math.round(this.W * S), bh = Math.round(this.H * S);

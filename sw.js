@@ -1,5 +1,5 @@
 // >>> A OGNI AGGIORNAMENTO CAMBIA QUESTO NUMERO <<<
-const VERSIONE = 'v1';
+const VERSIONE = 'v2';
 const CACHE = 'slime98-' + VERSIONE;
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-180.png', 'icon-512.png'];
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); });
