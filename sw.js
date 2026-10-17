@@ -2,16 +2,16 @@
 // sw.js — Slime Survivors 98: RETE PRIMA, cache solo se sei offline.
 // Così gli aggiornamenti arrivano subito e il gioco parte comunque senza connessione.
 // Quando vuoi forzare un reset totale delle cache, cambia CACHE (es. v3).
-const CACHE = 'slime98-v2';
+const CACHE = 'slime98-v3';
 const FILES = [
   './', 'index.html', 'manifest.json', 'icon-180.png', 'icon-512.png',
-  'css/game.css', 'assets/monsters.png',
-  'js/01_config.js', 'js/02_data_enemies.js', 'js/03_data_weapons.js', 'js/04_data_economy.js',
-  'js/05_data_maps.js', 'js/06_save.js', 'js/07_audio.js', 'js/08_sprites.js', 'js/09_art_eek_frames.js',
-  'js/10_art_characters.js', 'js/11_art_bosses.js', 'js/12_input.js', 'js/13_grid.js', 'js/14_entities.js',
-  'js/15_world.js', 'js/16_player.js', 'js/17_enemies.js', 'js/18_bosses.js', 'js/19_enemy_ai.js',
-  'js/20_weapons.js', 'js/21_upgrades.js', 'js/22_render.js', 'js/23_ui.js', 'js/24_village.js',
-  'js/25_monster_art.js', 'js/26_main.js',
+  'game.css', 'monsters.png',
+  '01_config.js', '02_data_enemies.js', '03_data_weapons.js', '04_data_economy.js',
+  '05_data_maps.js', '06_save.js', '07_audio.js', '08_sprites.js', '09_art_eek_frames.js',
+  '10_art_characters.js', '11_art_bosses.js', '12_input.js', '13_grid.js', '14_entities.js',
+  '15_world.js', '16_player.js', '17_enemies.js', '18_bosses.js', '19_enemy_ai.js',
+  '20_weapons.js', '21_upgrades.js', '22_render.js', '23_ui.js', '24_village.js',
+  '25_monster_art.js', '26_main.js',
 ];
 
 self.addEventListener('install', (e) => {
