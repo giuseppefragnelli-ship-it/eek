@@ -1,8 +1,14 @@
-<!doctype html><html lang="it"><head><meta charset="utf-8"><link rel="manifest" href="manifest.json"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Slime 98"><link rel="apple-touch-icon" href="icon-180.png"><meta name="theme-color" content="#050408"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>html,body{margin:0;padding:0;background:#050408}</style></head><body>
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
 <title>Slime Survivors 98</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="game.css" charset="utf-8">
+<link rel="stylesheet" href="css/game.css" charset="utf-8">
 <!--
   SLIME SURVIVORS 98 — dove sta cosa
   css/game.css                    tutto l'aspetto (tema Windows 98, telefono)
@@ -216,6 +222,7 @@
       <div class="wbody">
         <div class="lvl-head">Scegli</div>
         <div id="cards"></div>
+        <div class="lvl-foot"><button class="btn" id="reroll-btn" data-act="reroll"><span class="kb">[R] </span>↻ Rilancia le carte <b id="reroll-n">3</b></button></div>
       </div>
     </div>
   </div>
@@ -306,30 +313,31 @@
 
 <!-- Script classici (non moduli), caricati in ordine qui sotto. Per provarlo in locale serve un server http (vedi playtest.py). -->
 
-<script src="01_config.js" charset="utf-8"></script>
-<script src="02_data_enemies.js" charset="utf-8"></script>
-<script src="03_data_weapons.js" charset="utf-8"></script>
-<script src="04_data_economy.js" charset="utf-8"></script>
-<script src="05_data_maps.js" charset="utf-8"></script>
-<script src="06_save.js" charset="utf-8"></script>
-<script src="07_audio.js" charset="utf-8"></script>
-<script src="08_sprites.js" charset="utf-8"></script>
-<script src="09_art_eek_frames.js" charset="utf-8"></script>
-<script src="10_art_characters.js" charset="utf-8"></script>
-<script src="11_art_bosses.js" charset="utf-8"></script>
-<script src="12_input.js" charset="utf-8"></script>
-<script src="13_grid.js" charset="utf-8"></script>
-<script src="14_entities.js" charset="utf-8"></script>
-<script src="15_world.js" charset="utf-8"></script>
-<script src="16_player.js" charset="utf-8"></script>
-<script src="17_enemies.js" charset="utf-8"></script>
-<script src="18_bosses.js" charset="utf-8"></script>
-<script src="19_enemy_ai.js" charset="utf-8"></script>
-<script src="20_weapons.js" charset="utf-8"></script>
-<script src="21_upgrades.js" charset="utf-8"></script>
-<script src="22_render.js" charset="utf-8"></script>
-<script src="23_ui.js" charset="utf-8"></script>
-<script src="24_village.js" charset="utf-8"></script>
-<script src="25_monster_art.js" charset="utf-8"></script>
-<script src="26_main.js" charset="utf-8"></script>
-<script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");</script></body></html>
+<script src="js/01_config.js" charset="utf-8"></script>
+<script src="js/02_data_enemies.js" charset="utf-8"></script>
+<script src="js/03_data_weapons.js" charset="utf-8"></script>
+<script src="js/04_data_economy.js" charset="utf-8"></script>
+<script src="js/05_data_maps.js" charset="utf-8"></script>
+<script src="js/06_save.js" charset="utf-8"></script>
+<script src="js/07_audio.js" charset="utf-8"></script>
+<script src="js/08_sprites.js" charset="utf-8"></script>
+<script src="js/09_art_eek_frames.js" charset="utf-8"></script>
+<script src="js/10_art_characters.js" charset="utf-8"></script>
+<script src="js/11_art_bosses.js" charset="utf-8"></script>
+<script src="js/12_input.js" charset="utf-8"></script>
+<script src="js/13_grid.js" charset="utf-8"></script>
+<script src="js/14_entities.js" charset="utf-8"></script>
+<script src="js/15_world.js" charset="utf-8"></script>
+<script src="js/16_player.js" charset="utf-8"></script>
+<script src="js/17_enemies.js" charset="utf-8"></script>
+<script src="js/18_bosses.js" charset="utf-8"></script>
+<script src="js/19_enemy_ai.js" charset="utf-8"></script>
+<script src="js/20_weapons.js" charset="utf-8"></script>
+<script src="js/21_upgrades.js" charset="utf-8"></script>
+<script src="js/22_render.js" charset="utf-8"></script>
+<script src="js/23_ui.js" charset="utf-8"></script>
+<script src="js/24_village.js" charset="utf-8"></script>
+<script src="js/25_monster_art.js" charset="utf-8"></script>
+<script src="js/26_main.js" charset="utf-8"></script>
+</body>
+</html>
