@@ -220,6 +220,28 @@ const Render = {
     ctx.fillRect(x - h + 1, y - 1, 1, 1); ctx.fillRect(x + h - 2, y - h + 2, 1, 1); ctx.fillRect(x, y + h - 2, 1, 1);
   },
 
+  // TRIBOLI: tre chiodi a quattro punte grigio ferro; evoluti (Pegola Spessa) affondano in una pozza di pece che bolle
+  caltrop(x, y, r, fade, evo, seed) {
+    const ctx = this.ctx;
+    if (evo) {
+      ctx.globalAlpha = 0.85 * fade; this.ditherDisk(x, y, r, this.pat(PAL[1]));
+      ctx.globalAlpha = 0.7 * fade; this.ditherDisk(x, y, Math.max(1, (r * 0.6) | 0), this.pat(PAL[3])); ctx.globalAlpha = fade;
+      this.circle(x, y, r, PAL['~']);
+      const t = (performance.now() * 0.002 + seed * 0.37) % 1;   // bolla che sale e scoppia
+      ctx.fillStyle = PAL[5]; ctx.fillRect(x + ((seed * 5) % (r + 1)) - (r >> 1), y - Math.round(t * 2), 1, 1);
+    } else {
+      ctx.globalAlpha = 0.35 * fade; this.ditherDisk(x, y, r, this.pat(PAL[2])); ctx.globalAlpha = fade;
+    }
+    const n = 3, d = Math.max(1, r - 3);
+    for (let q = 0; q < n; q++) {
+      const a = q * 2.094 + seed * 1.3, cx = x + Math.round(Math.cos(a) * d * 0.6), cy = y + Math.round(Math.sin(a) * d * 0.5);
+      ctx.fillStyle = PAL[5]; ctx.fillRect(cx - 1, cy + 1, 3, 1);                     // ombra
+      ctx.fillStyle = PAL[7]; ctx.fillRect(cx - 1, cy, 3, 1); ctx.fillRect(cx, cy - 1, 1, 3);
+      ctx.fillStyle = (q + seed) & 1 ? PAL[8] : PAL[9]; ctx.fillRect(cx, cy - 2, 1, 1);  // punta in alto che luccica
+    }
+    ctx.globalAlpha = 1;
+  },
+
   // pozza di fuoco del Sabbione Ardente: brace scura, bordo arancio, fiammelle che salgono e scintille
   firePool(x, y, r, fade, rt, seed) {
     const ctx = this.ctx;
@@ -318,6 +340,7 @@ const Render = {
       const zr = Math.round(Zones.r[i] * S), fade = Zones.life[i] < 0.5 ? Zones.life[i] * 2 : 1;
       const zw = Zones.src[i] >= 0 ? Player.weapons[Zones.src[i]] : null;
       if (zw && zw.special && zw.special.fx === 'sabbione' && zw.id === 'bomb') { this.firePool(zx, zy, zr, fade, rt, i); continue; }
+      if (zw && zw.id === 'caltrops') { this.caltrop(zx, zy, zr, fade, zw.evolved, i); continue; }
       ctx.globalAlpha = 0.55 * fade; this.ditherDisk(zx, zy, zr, this.pat(Zones.slow[i] ? PAL.e : PAL.d)); ctx.globalAlpha = 1;
       this.circle(zx, zy, zr, zw && zw.evolved ? PAL['~'] : Zones.slow[i] ? PAL.e : PAL.c);
       const b = ((rt * 3 + i) | 0) % 5;
@@ -567,16 +590,17 @@ const Render = {
       ctx.drawImage(img, Math.round(x * S) + ox - (img.width >> 1), Math.round(y * S) + oy - (img.height >> 1));
     }
     // falci di luna e asce (girano su se stesse) e fuochi fatui (con scia)
-    const sc = SPR.cache.proj_scythe, wsp = SPR.cache.wisp, wse = SPR.cache.wisp_evo, axs = SPR.cache.proj_axe;
+    const sc = SPR.cache.proj_scythe, wsp = SPR.cache.wisp, wse = SPR.cache.wisp_evo, axs = SPR.cache.proj_axe, whl = SPR.cache.proj_wheel;
     for (let i = 0; i < P.count; i++) {
       const kd = P.kind[i];
-      if (P.alive[i] === 0 || (kd !== PK.SCYTHE && kd !== PK.WISP && kd !== PK.AXE)) continue;
+      if (P.alive[i] === 0 || (kd !== PK.SCYTHE && kd !== PK.WISP && kd !== PK.AXE && kd !== PK.WHEEL)) continue;
       const x = P.px[i] * ia + P.x[i] * alpha, y = P.py[i] * ia + P.y[i] * alpha;
       if (x < L || x > R || y < T || y > B) continue;
       const sx = Math.round(x * S) + ox, sy = Math.round(y * S) + oy;
-      if (kd === PK.SCYTHE || kd === PK.AXE) {
-        const spin = kd === PK.AXE ? (P.vx[i] > 0 ? 18 : -18) : 24;
-        const img = (kd === PK.AXE ? axs.rot : P.evo[i] ? sc.neonRot : sc.rot)[((((rt * spin) | 0) + i) % 16 + 16) & 15], sz = P.size[i];
+      if (kd === PK.SCYTHE || kd === PK.AXE || kd === PK.WHEEL) {
+        const spin = kd === PK.AXE ? (P.vx[i] > 0 ? 18 : -18) : kd === PK.WHEEL ? 30 : 24;
+        const src = kd === PK.AXE ? axs.rot : kd === PK.WHEEL ? (P.evo[i] ? whl.neonRot : whl.rot) : P.evo[i] ? sc.neonRot : sc.rot;
+        const img = src[((((rt * spin) | 0) + i) % 16 + 16) & 15], sz = P.size[i];
         const w = Math.round(img.width * sz), h = Math.round(img.height * sz);
         ctx.drawImage(img, sx - (w >> 1), sy - (h >> 1), w, h);
       } else {
@@ -965,7 +989,7 @@ const Render = {
     for (let i = 0; i < E.count; i++) {
       if (E.alive[i] === 0 || E.big[i] === 0) continue;
       const x = E.px[i] * ia + E.x[i] * alpha, y = E.py[i] * ia + E.y[i] * alpha;
-      const cfg = bossCfg(E.type[i]);
+      const B = Boss.slotOf(i), cfg = (B && B.trial) ? B.cfg : bossCfg(E.type[i]);   // i Custodi hanno il loro aspetto
       const s = (cfg && SPR.cache[cfg.sprite]) || SPR.cache[ENEMY_DEFS[E.type[i]].sprite];
       const sx = Math.round(x * S) + this.ox, sy = Math.round(y * S) + this.oy;
       const flip = s.face ? ((Player.x < x) === (s.face > 0)) : (cfg && cfg.faces === 'left' && s.mir && Player.x > x);   // si gira verso di te
@@ -978,7 +1002,7 @@ const Render = {
       }
       ctx.globalAlpha = 1;
       let tx = 0;
-      const B = Boss.slotOf(i), telling = !!B && B.state === 'tell' && E.type[i] === ET.boss;
+      const telling = !!B && B.state === 'tell' && E.type[i] === ET.boss;
       if (telling) {
         tx = (((rt * 40) | 0) & 1) ? 1 : -1; // trema
         // traiettoria della carica
@@ -988,7 +1012,7 @@ const Render = {
         }
       }
       const f = ((G.time * 3) | 0) & 1;
-      const tell = telling && (((rt * 12) | 0) & 1);
+      const tell = telling && !!s.tell && (((rt * 12) | 0) & 1);   // i Custodi non hanno il lampeggio rosso: solo il tremolio
       const img = tell ? (f ? s.tell2 : s.tell) : flip ? (f ? s.mir2 : s.mir) : (f ? s.img2 : s.img);
       ctx.drawImage(img, sx - (s.w >> 1) + tx, sy - (s.h >> 1), s.w, s.h);
     }

@@ -23,7 +23,15 @@ const Spawner = {
       Boss.warned1 = true;
       UI.toast('Avviso di sistema', 'Qualcosa di enorme si muove nel buio...', 6);
     }
-    if (!Boss.spawned1 && !Boss.active && t >= BOSS.time) spawnBoss(ET.boss);
+    if (!Boss.spawned1 && Boss.main() === 0 && t >= BOSS.time) spawnBoss(ET.boss);
+    // CUSTODE di una ricetta comprata dal Magister: uno alla volta (TRIAL)
+    if (Boss.trials() === 0 && t >= Boss.trialT - TRIAL.warnBefore) {
+      const key = Save.pendingRecipe();
+      if (key) {
+        if (!Boss.trialWarned) { Boss.trialWarned = true; UI.toast('Avviso di sistema', 'Il Magister ti mette alla prova: qualcuno custodisce una fusione...', 5); }
+        if (t >= Boss.trialT && !spawnTrial(key)) Boss.trialT = t + 5;   // pieno di boss: riprova tra poco
+      }
+    }
     // VITTORIA al minuto 7: basta resistere
     if (!G.won && !G.victory) {
       if (!Boss.warnedWin && t >= WIN.warnAt) { Boss.warnedWin = true; UI.toast('Avviso di sistema', "Ancora un poco: l'uscita è vicina...", 5); }
@@ -44,7 +52,7 @@ const Spawner = {
         Boss.endlessT = t + ENDLESS.bossEvery;
       }
       // poi tornano uno alla volta, quando non ce n'è nessuno in giro (sempre più forti col tempo)
-      if (Boss.spawnedTrio && !Boss.active && t >= Boss.endlessT) {
+      if (Boss.spawnedTrio && Boss.main() === 0 && t >= Boss.endlessT) {
         Boss.endlessT = t + ENDLESS.bossEvery;
         spawnBoss([ET.boss, ET.boss2, ET.boss3][Boss.endlessN++ % 3]);
       }

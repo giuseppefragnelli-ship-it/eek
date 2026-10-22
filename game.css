@@ -522,6 +522,7 @@ body.touch #cards { gap: 8px; }
 /* ---------- HUD: barra XP + tasto pausa ---------- */
 .hud-top { display: flex; gap: 4px; align-items: stretch; }
 .hud-top #xpbar { flex: 1; }
+.hud-fast.on { background: #000 !important; color: var(--neon) !important; box-shadow: inset 0 0 0 1px var(--neon), 0 0 4px rgba(200, 255, 30, .5) !important; }
 .hud-pause { min-width: 0 !important; width: 30px; height: 22px !important; padding: 0 !important; font: bold 11px var(--pixel) !important; letter-spacing: -1px; }
 body.touch .hud-pause { width: 40px; height: 30px !important; font-size: 13px !important; }
 body.touch #xpbar { height: 20px; }

@@ -23,7 +23,7 @@ const CFG = {
   MAX_GEMS: 2500,
   MAX_FX: 1500,
   MAX_ESHOTS: 600,        // proiettili dei nemici (Sputacchini, boss finale)
-  MAX_ZONES: 64,          // pozze acide
+  MAX_ZONES: 160,         // pozze acide, di fuoco e triboli
 
   GRID_CELL: 64,
   GRID_MARGIN: 320,

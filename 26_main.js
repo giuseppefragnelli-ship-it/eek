@@ -16,6 +16,7 @@ function setState(s) {
 }
 
 function startRun() {
+  UI.syncFast();
   abandonRun();   // "Ricomincia" dalla pausa: la partita lasciata conta comunque
   G.mapId = Save.mapUnlocked(Save.data.map) ? Save.data.map : 'cripta';
   G.map = MAPS[G.mapId];
@@ -279,6 +280,7 @@ function handleKeys() {
     else if (s === 'village') goToMenu();
   }
   if (Input.consume('KeyO')) { G.debug = !G.debug; UI.setDebug(G.debug); }
+  if (s === 'play' && Input.consume('KeyF')) UI.toggleFast();
   if (s === 'play') {
     if (Input.consume('Space') || Input.consume('ShiftLeft') || Input.consume('ShiftRight') || Input.dashReq) { Input.dashReq = false; Player.tryDash(); }
     // vicino al Magister E/Invio parlano con lui; altrimenti E/Q = teletrasporto
@@ -337,9 +339,10 @@ function frame(now) {
   }
   const running = (G.state === 'play' && G.hitStop <= 0) || G.state === 'village';
   if (running) {
-    acc += dtReal;
+    const fast = G.state === 'play' && Save.data.settings.fast ? 2 : 1;   // VELOCITÀ x2: il doppio dei passi a parità di tempo vero
+    acc += dtReal * fast;
     let steps = 0;
-    while (acc >= CFG.DT && steps < CFG.MAX_STEPS) {
+    while (acc >= CFG.DT && steps < CFG.MAX_STEPS * fast) {
       const scene = G.scene;
       if (G.state === 'village') Village.step(CFG.DT); else step(CFG.DT);
       if (G.scene !== scene) { acc = 0; break; }   // BUG risolto: entrando nel portale acc diventava negativo
@@ -347,7 +350,7 @@ function frame(now) {
       steps++;
       if (G.state !== 'play' && G.state !== 'village') break;
     }
-    if (steps === CFG.MAX_STEPS) acc = 0;
+    if (steps >= CFG.MAX_STEPS * fast) acc = 0;
   }
   if (G.scene === 'menu') { tickMenuBackdrop(dtReal); if (G.state === 'menu') UI.tickMenu(dtReal); }
   const t1 = performance.now();

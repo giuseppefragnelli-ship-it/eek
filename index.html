@@ -3,52 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Slime 98">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-180.png">
-<style>html,body{margin:0;padding:0;background:#050408}</style>
 <title>Slime Survivors 98</title>
-</head>
-<body>
-
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="game.css" charset="utf-8">
+</head>
+<body>
 <!--
   SLIME SURVIVORS 98 — dove sta cosa
-  css/game.css                    tutto l'aspetto (tema Windows 98, telefono)
-  assets/monsters.png             mostri e boss disegnati (atlas)
+  game.css                        tutto l'aspetto (tema Windows 98, telefono)
+  monsters.png                    mostri e boss disegnati (atlas)
   I file JS si caricano in quest'ordine e condividono le stesse variabili globali
   (script classici, non moduli): un file può usare ciò che è definito nei file prima.
-     js/01_config.js             CFG (tutti i numeri globali) e DIFFICULTY (solo Incubo)
-     js/02_data_enemies.js       ENEMY_DEFS, costanti dei nemici speciali (ELITE, NIGHT, BOSS...), SPAWN
-     js/03_data_weapons.js       WEAPON_DEFS, PASSIVE_DEFS, carte di riempimento
-     js/04_data_economy.js       monete, negozio, fabbro, missioni, maestrie, presagi, CHARACTERS
-     js/05_data_maps.js          MAPS, MAP_BOSSES, VILLAGE
-     js/06_save.js               Save (localStorage) + Cloud (salvataggio online)
-     js/07_audio.js              Sfx + SFX_DEFS (suoni generati con Web Audio)
-     js/08_sprites.js            PAL (palette) + SPR (pixel art generata da codice)
-     js/09_art_eek_frames.js     EEK_HI: i fotogrammi di Eek (solo dati, righe di pixel)
-     js/10_art_characters.js     Doll: personaggi e abitanti ad alta risoluzione
-     js/11_art_bosses.js         BossArt: i boss delle mappe disegnati da codice
-     js/12_input.js              Input: tastiera + joystick touch
-     js/13_grid.js               Grid: griglia spaziale per trovare i vicini
-     js/14_entities.js           Pool (Struct of Arrays), G (stato partita), helper spawn/danno
-     js/15_world.js              MapGen (mondo infinito a blocchi) + Obs (ostacoli)
-     js/16_player.js             Player: movimento, statistiche, danno, XP, gemme
-     js/17_enemies.js            Spawner + scelta del tipo di nemico
-     js/18_bosses.js             Boss (anche più insieme), fulmini del boss 2
-     js/19_enemy_ai.js           cacciatori, notte, updateEnemies (IA + separazione), proiettili nemici
-     js/20_weapons.js            armi: WEAPON_LOGIC, proiettili, zone
-     js/21_upgrades.js           Upgrades: carte del level up e forzieri
-     js/22_render.js             Render: disegno della partita
-     js/23_ui.js                 UI: menu, carte, pausa, morte, HUD, negozio
-     js/24_village.js            Village: la scena tra le partite
-     js/25_monster_art.js        MonsterArt: carica assets/monsters.png e rimpiazza gli sprite
-     js/26_main.js               stati, startRun, step, game loop (FPS_CAP), boot
+     01_config.js             CFG (tutti i numeri globali) e DIFFICULTY (solo Incubo)
+     02_data_enemies.js       ENEMY_DEFS, costanti dei nemici speciali (ELITE, NIGHT, BOSS...), SPAWN
+     03_data_weapons.js       WEAPON_DEFS, PASSIVE_DEFS, carte di riempimento
+     04_data_economy.js       monete, negozio, fabbro, missioni, maestrie, presagi, CHARACTERS
+     05_data_maps.js          MAPS, MAP_BOSSES, VILLAGE
+     06_save.js               Save (localStorage) + Cloud (salvataggio online)
+     07_audio.js              Sfx + SFX_DEFS (suoni generati con Web Audio)
+     08_sprites.js            PAL (palette) + SPR (pixel art generata da codice)
+     09_art_eek_frames.js     EEK_HI: i fotogrammi di Eek (solo dati, righe di pixel)
+     10_art_characters.js     Doll: personaggi e abitanti ad alta risoluzione
+     11_art_bosses.js         BossArt: i boss delle mappe disegnati da codice
+     12_input.js              Input: tastiera + joystick touch
+     13_grid.js               Grid: griglia spaziale per trovare i vicini
+     14_entities.js           Pool (Struct of Arrays), G (stato partita), helper spawn/danno
+     15_world.js              MapGen (mondo infinito a blocchi) + Obs (ostacoli)
+     16_player.js             Player: movimento, statistiche, danno, XP, gemme
+     17_enemies.js            Spawner + scelta del tipo di nemico
+     18_bosses.js             Boss (anche più insieme), fulmini del boss 2
+     19_enemy_ai.js           cacciatori, notte, updateEnemies (IA + separazione), proiettili nemici
+     20_weapons.js            armi: WEAPON_LOGIC, proiettili, zone
+     21_upgrades.js           Upgrades: carte del level up e forzieri
+     22_render.js             Render: disegno della partita
+     23_ui.js                 UI: menu, carte, pausa, morte, HUD, negozio
+     24_village.js            Village: la scena tra le partite
+     25_monster_art.js        MonsterArt: carica assets/monsters.png e rimpiazza gli sprite
+     26_main.js               stati, startRun, step, game loop (FPS_CAP), boot
 -->
 
 <div id="stage"><canvas id="game"></canvas><canvas id="hi"></canvas></div>
@@ -65,6 +57,7 @@
   <div id="hud">
     <div class="hud-top">
       <div id="xpbar" class="sunken"><div id="xpfill"></div><span id="lvl">LV 1</span></div>
+      <button class="btn hud-pause hud-fast" id="fastbtn" data-act="fast" aria-label="Velocità x2">x2</button>
       <button class="btn hud-pause" data-act="start" aria-label="Pausa">II</button>
     </div>
     <div id="slots">
@@ -350,7 +343,5 @@
 <script src="24_village.js" charset="utf-8"></script>
 <script src="25_monster_art.js" charset="utf-8"></script>
 <script src="26_main.js" charset="utf-8"></script>
-
-
 </body>
 </html>

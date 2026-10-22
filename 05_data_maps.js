@@ -78,7 +78,7 @@ const UNLOCKS = {
 };
 
 // IL MAGISTER — ha lasciato il Villaggio: studia tra le rovine della Cattedrale, a destra della partenza
-// (circa un minuto di cammino). Parlandoci in partita si apre la sua Schola (studi delle passive + Arcanum [?]).
+// (circa un minuto di cammino). Parlandoci in partita si apre la sua Schola (studi delle passive + ricette di fusione).
 //   clearR = niente ostacoli attorno | talkR = distanza per parlarci | hintR = da qui freccia sul bordo e avviso
 const MAGISTER_CAMP = { map: 'cattedrale', x: 9000, y: 0, clearR: 230, talkR: 62, hintR: 3400 };
 

@@ -105,8 +105,11 @@ const QUESTS = [
 
 // MAGISTER — studia le passive: ogni grado = +20% all'effetto per livello (permanente)
 const MASTERY = { max: 3, bonus: 0.2, costs: [8, 15, 25], exclude: ['amount'] };
-// ARCANUM [?] — lo vende il Magister: una fusione di due armi al massimo (vedi FUSION). Si consuma quando fondi.
-const ARCANUM = { name: 'Arcanum [?]', icon: 'ico_arcanum', price: 15, max: 9 };
+// RICETTE DI FUSIONE — le vende il Magister, una per coppia di FUSION_SPECIAL, UNA volta sola (si possono comprare tutte).
+// Comprata = arriva il suo Custode in partita (TRIAL); battuto = fusione sbloccata per sempre.
+const RECIPE = { price: 25, icon: 'ico_arcanum' };
+// ARCANUM [?] — vecchio consumabile (tolto il 2026-10-22): chi ne aveva viene rimborsato a `price` l'uno (Save.normalize).
+const ARCANUM = { name: 'Arcanum [?]', price: 15 };
 
 // ARUSPICE — omina: bonus casuali su armi e armature (2 per oggetto). Le armi contano solo se equipaggiate.
 // rarità: 0 Vulgare, 1 Rarum, 2 Divinum

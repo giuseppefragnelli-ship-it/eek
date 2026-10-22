@@ -29,7 +29,8 @@ const Save = {
       chars: ['eek'],       // personaggi sbloccati
       char: 'eek',          // personaggio scelto
       stones: 0,            // Pietre del Fabbro
-      arcana: 0,            // Arcanum [?] del Magister (fusioni d'arma da usare)
+      arcana: 0,            // vecchio Arcanum [?]: rimborsato in monete e azzerato da normalize
+      recipes: {},          // ricette di fusione (FUSION_SPECIAL): chiave -> 1 comprata (Custode da battere) | 2 sbloccata
       unlocks: {},          // sblocchi segreti (UNLOCKS): id -> true
       fusions: {},          // fusioni uniche già scoperte (FUSION_SPECIAL): chiave -> true
       wins: {},             // mappe vinte: id -> true
@@ -44,7 +45,7 @@ const Save = {
       stats: { kills: 0, bosses: {}, elites: 0, chests: 0, evos: 0, winsDiff: {}, endlessBest: 0, omens: 0 },
       records: {},          // 'mappa/difficoltà' -> { t, k, lv, win, endless }
       tips: {},             // consigli già visti
-      settings: { joy: 'float', shake: true, numbers: true, flash: true, sfx: true, vol: 'mid' }, // joy: 'float' | 'left' | 'right'
+      settings: { joy: 'float', shake: true, numbers: true, flash: true, sfx: true, vol: 'mid', fast: false }, // joy: 'float' | 'left' | 'right'
     };
   },
 
@@ -65,7 +66,11 @@ const Save = {
     d.mastery = d.mastery || {}; d.omens = d.omens || {};
     d.unlocks = d.unlocks && typeof d.unlocks === 'object' ? d.unlocks : {};
     d.fusions = d.fusions && typeof d.fusions === 'object' ? d.fusions : {};
-    d.arcana = Math.max(0, Math.min(ARCANUM.max, d.arcana | 0));
+    d.recipes = d.recipes && typeof d.recipes === 'object' ? d.recipes : {};
+    for (const k in d.recipes) if (!FUSION_SPECIAL[k] || (d.recipes[k] !== 1 && d.recipes[k] !== 2)) delete d.recipes[k];
+    // l'Arcanum [?] non esiste più: quelli rimasti tornano monete
+    if ((d.arcana | 0) > 0) { d.coins = (d.coins || 0) + (d.arcana | 0) * ARCANUM.price; }
+    d.arcana = 0;
     for (const id in d.mastery) if (!PASSIVE_DEFS[id]) delete d.mastery[id];
     for (const id in d.omens) if (!SHOP_ITEMS[id] || !Array.isArray(d.omens[id])) delete d.omens[id];
     if (!SHOP_ITEMS[d.gear] || !SHOP_ITEMS[d.gear].gear) d.gear = 'dagger';
@@ -230,13 +235,17 @@ const Save = {
     return true;
   },
 
-  // Arcanum [?]: si compra dal Magister, si consuma fondendo due armi in partita
-  buyArcanum() {
-    if ((this.data.arcana || 0) >= ARCANUM.max || !this.spend(ARCANUM.price)) return false;
-    this.data.arcana = (this.data.arcana || 0) + 1;
+  // RICETTE di fusione: 0 non comprata, 1 comprata (Custode da battere), 2 sbloccata per sempre
+  recipeState(key) { return this.data.recipes[key] | 0; },
+  recipeOpen(key) { return this.recipeState(key) === 2; },
+  buyRecipe(key) {
+    if (!FUSION_SPECIAL[key] || this.recipeState(key) || !this.spend(RECIPE.price)) return false;
+    this.data.recipes[key] = 1;
     this.write();
     return true;
   },
+  // prima ricetta comprata con il Custode ancora da battere (null se nessuna)
+  pendingRecipe() { for (const k in FUSION_SPECIAL) if (this.recipeState(k) === 1) return k; return null; },
 
   // ---- sblocchi segreti (UNLOCKS) ----------------------------------------------
   unlocked(id) { return !!(this.data && this.data.unlocks[id]); },

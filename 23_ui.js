@@ -92,6 +92,7 @@ const UI = {
       case 'save-export': this.saveExport(); break;
       case 'save-import': this.saveImportShow(); break;
       case 'save-import-go': this.saveImport(); break;
+      case 'fast': this.toggleFast(); break;
       case 'start':
         if (G.state === 'play') setState('paused');
         else if (G.state === 'paused') setState('play');
@@ -291,18 +292,18 @@ const UI = {
     txt += pad('Livello massimo', 22) + d.bestLevel + '\n';
     txt += pad('Missioni completate', 22) + Object.keys(d.quests).length + ' / ' + QUESTS.length + '\n';
     txt += pad('Monete totali', 22) + d.totalCoins + '\n';
-    txt += pad('Arcanum [?]', 22) + (d.arcana || 0) + '\n';
+    { let nr = 0; for (const k in FUSION_SPECIAL) if (Save.recipeOpen(k)) nr++; txt += pad('Fusioni sbloccate', 22) + nr + ' / ' + Object.keys(FUSION_SPECIAL).length + '\n'; }
     // sblocchi segreti: cosa serve per averli
     txt += '\nSEGRETI\n=======\n';
     for (const id in UNLOCKS) {
       const u = UNLOCKS[id], got = Save.unlocked(id);
       txt += pad(got ? u.name : '???', 22) + (got ? u.kind + ' — sbloccato' : u.hint) + '\n';
     }
-    // fusioni uniche: quelle già fatte col nome, le altre col nome delle due armi
-    txt += '\nFUSIONI UNICHE (Arcanum [?])\n============================\n';
+    // fusioni (le uniche coppie che si fondono): ricetta dal Magister -> Custode in partita -> sbloccata
+    txt += '\nFUSIONI (ricette del Magister)\n==============================\n';
     for (const k in FUSION_SPECIAL) {
-      const ids = k.split('+'), pair = WEAPON_DEFS[ids[0]].name + ' + ' + WEAPON_DEFS[ids[1]].name;
-      txt += pad(d.fusions[k] ? FUSION_SPECIAL[k].name : '???', 22) + pair + '\n';
+      const ids = k.split('+'), pair = WEAPON_DEFS[ids[0]].name + ' + ' + WEAPON_DEFS[ids[1]].name, st = Save.recipeState(k);
+      txt += pad(FUSION_SPECIAL[k].name, 22) + pair + ' — ' + (st === 2 ? 'sbloccata' : st === 1 ? 'batti ' + FUSION_SPECIAL[k].custode.name : 'ricetta dal Magister') + '\n';
     }
     $('records-text').textContent = txt;
     setState('records');
@@ -505,17 +506,22 @@ const UI = {
       // il Magister non c'è più: è sceso nella Cattedrale (MAGISTER_CAMP)
       const open = Save.mapUnlocked(MAGISTER_CAMP.map);
       h = '<div class="hint" style="padding:10px;line-height:1.5">"Sono sceso a studiare tra le rovine della ' + MAPS[MAGISTER_CAMP.map].name.replace(/^La /, '') +
-        '. Chi cerca i miei studi o un Arcanum [?] parta da lì e cammini verso destra, più o meno un minuto: seguite la lanterna."<br>— il Magister' +
+        '. Chi cerca i miei studi o le ricette di fusione parta da lì e cammini verso destra, più o meno un minuto: seguite la lanterna."<br>— il Magister' +
         (open ? '' : '<br><br>(La ' + MAPS[MAGISTER_CAMP.map].short + ' si apre vincendo ' + MAPS[MAPS[MAGISTER_CAMP.map].unlock].name.replace(/^La /, 'la ') + '.)') + '</div>';
     } else if (this.shopTab === 'mastery') {
-      // ARCANUM [?]: fusione di due armi al massimo (si consuma in partita, dalla carta FUSIONE del level up)
-      const na = d.arcana || 0, full = na >= ARCANUM.max;
-      h += '<div class="srow arow"><div class="simg sunken"><img src="' + SPR.url[ARCANUM.icon] + '"></div>' +
-        '<div><span class="sname">' + ARCANUM.name + '</span><span class="slv">x' + na + '</span>' +
-        '<div class="sdesc">Due armi al massimo (Lv 5 o evolute) si fondono in una più forte: un posto libero, +' + Math.round((FUSION.dmg - 1) * 100) +
-        '% danno, ricarica più breve, +area, +1 colpo. Esce come carta nel level up. Cinque coppie hanno una fusione unica (vedi Record.txt).</div></div>' +
-        (full ? '<button class="btn" disabled>Pieno</button>'
-              : '<button class="btn" data-buy="arcanum" data-id="arcanum"' + (d.coins < ARCANUM.price ? ' disabled' : '') + '>Compra ' + this.price(ARCANUM.price) + '</button>') + '</div>';
+      // RICETTE DI FUSIONE: si comprano una volta sola; poi in partita arriva il Custode (TRIAL), battuto = sbloccata per sempre
+      h += '<div class="hint" style="margin:2px 0 4px">Ricette di fusione: si comprano una volta sola. In partita arriva il loro Custode: battilo e la fusione è tua per sempre. ' +
+        'Con le due armi al massimo (Lv 5 o evolute) esce la carta FUSIONE: un posto libero, +' + Math.round((FUSION.dmg - 1) * 100) + '% danno, ricarica più breve.</div>';
+      for (const k in FUSION_SPECIAL) {
+        const sp = FUSION_SPECIAL[k], ids = k.split('+'), st = Save.recipeState(k);
+        const pair = WEAPON_DEFS[ids[0]].name + ' + ' + WEAPON_DEFS[ids[1]].name;
+        h += '<div class="srow arow"><div class="simg sunken"><img src="' + SPR.url[RECIPE.icon] + '"></div>' +
+          '<div><span class="sname">' + sp.name + '</span> <span class="slv">' + pair + '</span>' +
+          '<div class="sdesc">' + sp.desc + (st === 1 ? ' <b>Custode: ' + sp.custode.name + ', arriva al ' + fmtTime(TRIAL.time) + '.</b>' : '') + '</div></div>' +
+          (st === 2 ? '<button class="btn" disabled>Sbloccata</button>'
+           : st === 1 ? '<button class="btn" disabled>Da battere</button>'
+           : '<button class="btn" data-buy="recipe" data-id="' + k + '"' + (d.coins < RECIPE.price ? ' disabled' : '') + '>Compra ' + this.price(RECIPE.price) + '</button>') + '</div>';
+      }
       for (const id in PASSIVE_DEFS) {
         if (MASTERY.exclude.indexOf(id) >= 0) continue;
         const p = PASSIVE_DEFS[id], r = Save.masteryRank(id), max = r >= MASTERY.max, cost = Save.masteryCost(id);
@@ -621,8 +627,8 @@ const UI = {
       if (Save.upgradeShop(id)) { Sfx.play('anvil'); this.shopMsg('Bottega migliorata! ' + SHOP_UPGRADES[id].unlocks[Save.shopLevel(id) - 1] + '.', 'ok'); }
     } else if (kind === 'qcat') {
       this.questCat = id;
-    } else if (kind === 'arcanum') {
-      if (Save.buyArcanum()) { Sfx.play('buy'); this.shopMsg(ARCANUM.name + ' comprato! Ne hai ' + Save.data.arcana + '. Porta due armi al massimo e fondile dal level up.', 'ok'); }
+    } else if (kind === 'recipe') {
+      if (Save.buyRecipe(id)) { Sfx.play('buy'); this.shopMsg('Ricetta di ' + FUSION_SPECIAL[id].name + ' comprata! Nella prossima discesa ti aspetta ' + FUSION_SPECIAL[id].custode.name + ': battilo.', 'ok'); }
     } else if (kind === 'mastery') {
       if (Save.buyMastery(id)) { if (G.scene === 'run') Player.recalcStats(); Sfx.play('quest'); this.shopMsg(PASSIVE_DEFS[id].name + ' ' + 'I II III'.split(' ')[Save.masteryRank(id) - 1] + '.', 'ok'); }
     } else if (kind === 'omen') {
@@ -834,6 +840,16 @@ const UI = {
 
   // ---- boss e avvisi -------------------------------------------------------------
   _bossPct: -1,
+  // VELOCITÀ x2 (tasto F o il bottone x2 nella HUD): la partita corre al doppio, resta accesa finché non la spegni
+  toggleFast(on) {
+    const S = Save.data.settings;
+    S.fast = on === undefined ? !S.fast : !!on;
+    Save.write();
+    this.syncFast();
+    if (G.state === 'play') this.toast('Velocità', S.fast ? 'x2: il tempo corre al doppio.' : 'x1: velocità normale.', 1.5);
+  },
+  syncFast() { const b = $('fastbtn'); if (b) b.classList.toggle('on', !!Save.data.settings.fast); },
+
   showBoss(on) {
     $('bossbar').classList.toggle('show', on);
     if (on) $('boss-name').textContent = bossNames();
@@ -931,7 +947,6 @@ const UI = {
     for (const r of weaponRows()) {
       h += '<div class="brow' + (r.f ? ' fuse' : '') + '"><img src="' + SPR.url[weaponIcon(r.w)] + '"><span>' + esc(r.name) + '</span><b>' + Math.round(r.dealt).toLocaleString('it-IT') + '</b></div>';
     }
-    if ((Save.data.arcana || 0) > 0) h += '<div class="hint">' + ARCANUM.name + ': ' + Save.data.arcana + ' (fondi due armi al massimo dal level up)</div>';
     h += '<div class="end-h2" style="margin-top:6px">Passive</div>';
     if (!P.passives.length) h += '<div class="hint">Nessuna.</div>';
     for (const p of P.passives) h += '<div class="brow"><img src="' + SPR.url[p.def.icon] + '"><span>' + esc(p.def.name) + '</span><b>Lv ' + p.level + '</b></div>';
@@ -997,8 +1012,9 @@ const TIPS = [
   'Il Fabbro può sempre fallire. Una Pietra del Fabbro (la lasciano i boss) aggiunge +30% di riuscita.',
   'Si gioca solo a Incubo: slime più veloci e cattivi, ma ogni moneta vale x5.',
   'Dalle Opzioni puoi esportare un codice di salvataggio per portare i progressi su un altro dispositivo.',
-  'Il Magister ha lasciato il Villaggio: lo trovi nella Cattedrale Sconsacrata, camminando verso destra per circa un minuto. Vende gli studi delle passive e l\'Arcanum [?].',
-  'Arcanum [?]: con due armi al massimo esce la carta FUSIONE, e diventano un\'arma sola, più forte, che occupa un posto solo.',
-  'Cinque coppie di armi hanno una FUSIONE UNICA con un effetto tutto loro. Nel Record.txt trovi quali coppie provare.',
+  'Il Magister ha lasciato il Villaggio: lo trovi nella Cattedrale Sconsacrata, camminando verso destra per circa un minuto. Vende gli studi delle passive e le ricette di fusione.',
+  'Solo cinque coppie di armi si fondono. Il Magister vende le ricette, una volta sola: poi in partita batti il loro Custode e la fusione è tua per sempre.',
+  'Con una fusione sbloccata e le sue due armi al massimo esce la carta FUSIONE: nasce una terza arma che occupa un posto solo. Le coppie sono nel Record.txt.',
+  'Il bottone x2 accanto alla pausa (o il tasto F) fa correre la partita al doppio della velocità. Ripremilo per tornare normale.',
   'Alcune cose non si comprano: si guadagnano resistendo a lungo dopo la vittoria. Nel Record.txt trovi i SEGRETI ancora da sbloccare.',
 ];

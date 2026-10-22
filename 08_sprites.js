@@ -360,6 +360,8 @@ const SPR = {
     this.fromRows('proj_arrow', ['66......9..', 'hhhhhhhh9ww', '66......9..'], { rotate: true });
     // freccia dell'Arciere nemico: grossa, impennaggio rosso, punta bianca (deve vedersi da lontano)
     this.fromRows('eb_arrow', ['DDD............9......', '.DDD...........999....', '..DDD..........99999..', '..C8888888888889wwwwww', '..DDD..........99999..', '.DDD...........999....', 'DDD............9......'], { rotate: true });
+    // Rota Fortunae: ruota d'oro con i raggi (16 rotazioni: gira su se stessa)
+    this.fromRows('proj_wheel', ['...LLL...', '.LL.K.LL.', '.L.KKK.L.', 'L.K.K.K.L', 'LKKKwKKKL', 'L.K.K.K.L', '.L.KKK.L.', '.LL.K.LL.', '...LLL...'], { rotate: true });
     this.fromRows('proj_axe', ['..7999...', '.79ww99..', '.79w999h.', '..799.h..', '.....h...', '....h....', '...h.....', '..h......', '.i.......'], { rotate: true });
 
     this.fromRows('well', ['..6666666666..', '.677777777776.', '67qqqqqqqqqq76', '67qrrrrrrrrq76', '.677777777776.', '.556565656555.', '.565656565655.', '.555555555555.', '..4444444444..']);
@@ -1076,6 +1078,8 @@ const SPR = {
     this.fromRows('ico_beam', ['....L....', '.L..9..L.', '..L999L..', '..99w99..', 'LL9www9LL', '..99w99..', '..L999L..', '.L..9..L.', '....L....']);
     this.fromRows('ico_frost', ['...{.{...', '....]....', '.{..]..{.', '..{.].{..', ']]]]w]]]]', '..{.].{..', '.{..]..{.', '....]....', '...{.{...']);
     this.fromRows('ico_helix', ['..LLLLL..', '.L.....L.', 'L..KKK..L', 'L.K...K.L', 'L.K.w.K.L', 'L.K..KK.L', 'L..K....L', '.L..KKKL.', '..L......']);
+    this.fromRows('ico_wheel', ['...LLL...', '.LLKKKLL.', '.LwLKLKL.', 'LKLKKKLKL', 'LKKKwKKKL', 'LKLKKKLKL', '.LKLKLKL.', '.LLKKKLL.', '...LLL...']);
+    this.fromRows('ico_caltrop', ['....9....', '....8....', '....7....', '9.67876.9', '.8778778.', '..67876..', '...6.6...', '..6...6..', '.5.....5.']);
     this.fromRows('ico_area', ['7.......7', '.7.....7.', '..8...8..', '...999...', '...9w9...', '...999...', '..8...8..', '.7.....7.', '7.......7']);
     this.fromRows('ico_twins', ['.w....w.', 'w9w..w9w', '.w....w.', '.7....7.', '.777777.', '.7....7.', '.7....7.']);
     // Arcanum [?] del Magister: scrigno viola col punto di domanda (fusione delle armi)
@@ -1097,7 +1101,7 @@ const SPR = {
     this.floors = { cripta: this.floor, village: this.makeFloor('village') };
     for (const k of ['palude', 'cattedrale', 'selva', 'dite', 'cocito', 'slab', 'plaza']) this.floors[k] = this.makeFloor(k);
     // versioni col contorno neon degli sprite che le armi evolute lanciano
-    for (const n of ['proj_salt', 'proj_kunai', 'orb', 'proj_scythe', 'bomb', 'flask']) this.neon(n);   // Linguae Ignis evoluta usa wisp_evo
+    for (const n of ['proj_salt', 'proj_kunai', 'orb', 'proj_scythe', 'bomb', 'flask', 'proj_wheel']) this.neon(n);   // Linguae Ignis evoluta usa wisp_evo
     // giorno un po' più chiaro sulle altre mappe (il villaggio resta com'è)
     for (const k of ['palude', 'cattedrale', 'selva', 'dite', 'cocito', 'slab']) this.lighten(this.floors[k], DAY_LIFT.mul, DAY_LIFT.add);
   },

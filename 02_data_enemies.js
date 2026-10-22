@@ -106,6 +106,12 @@ const SPIT = { share: 0.05, range: 340, cd: 5.0, tell: 0.9, lock: 0.3, speed: 33
 // FORZIERI — li lasciano i Cacciatori (a volte) e i boss (sempre): 1 o 3 potenziamenti
 const CHEST = { eliteChance: 0.45, three: 0.3 };
 
+// CUSTODI DELLE FUSIONI — compri una ricetta dal Magister (RECIPE in 04_data_economy.js), poi in partita arriva il suo
+// Custode: battilo e la fusione è tua per sempre. Se muori resta comprata e il Custode torna alla partita dopo.
+//   time = secondo del primo Custode | warnBefore = avviso | gap = attesa dopo averne battuto uno (se ne hai comprate più)
+//   hp / dmg = moltiplicatori rispetto a Flegiàs (cammina, carica ed evoca come lui, ma con l'aspetto e i servi suoi)
+const TRIAL = { time: 150, warnBefore: 8, gap: 30, hp: 0.45, dmg: 0.8 };
+
 // MODALITÀ INFINITA — dopo la vittoria puoi continuare: al minuto 10 il trio, poi un boss ogni tot secondi
 const ENDLESS = { bossEvery: 100 };
 

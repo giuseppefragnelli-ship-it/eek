@@ -33,15 +33,14 @@ const Upgrades = {
       const seen = (o) => avoid.some((a) => a.type === o.type && a.id === o.id);
       pool.sort((a, b) => seen(a) - seen(b));   // stabile: le carte nuove restano mescolate davanti
     }
-    // FUSIONE: con un Arcanum [?] e due armi al massimo esce SEMPRE una carta di fusione (una coppia per volta;
-    // il rilancio prova un'altra coppia)
+    // FUSIONE: con una ricetta sbloccata (FUSION_SPECIAL comprata + Custode battuto) e le sue due armi al massimo
+    // esce SEMPRE una carta di fusione (una coppia per volta; il rilancio prova un'altra coppia). È gratis.
     let fuse = null;
-    if ((Save.data.arcana || 0) > 0) {
+    {
       const pairs = fusionPairs();
       if (pairs.length) {
         const seenPair = (p) => avoid && avoid.some((a) => a.type === 'fuse' && ((a.id === p[0].id && a.id2 === p[1].id) || (a.id === p[1].id && a.id2 === p[0].id)));
-        const fresh = pairs.filter((p) => !seenPair(p)), from0 = fresh.length ? fresh : pairs;
-        const uniq = from0.filter((p) => FUSION_SPECIAL[fuseKey(p[0].id, p[1].id)]), from = uniq.length ? uniq : from0;   // le fusioni uniche prima
+        const fresh = pairs.filter((p) => !seenPair(p)), from = fresh.length ? fresh : pairs;
         const p = from[(Math.random() * from.length) | 0];
         fuse = { type: 'fuse', id: p[0].id, id2: p[1].id };
       }
@@ -63,11 +62,9 @@ const Upgrades = {
       return { name: d.name, icon: d.icon, badge: 'NUOVA ARMA', desc: d.desc, kind: 'Arma' };
     }
     if (o.type === 'fuse') {
-      const a = findWeapon(o.id), b = findWeapon(o.id2), F = FUSION, n = Save.data.arcana || 0, sp = FUSION_SPECIAL[fuseKey(a.id, b.id)];
-      if (sp) return { name: sp.name, icon: ARCANUM.icon, fw: [a, b], badge: 'FUSIONE UNICA', kind: baseWeaponName(a) + ' + ' + baseWeaponName(b), fuse: true,
-        desc: sp.desc + ' In più: un posto libero, +' + Math.round((F.dmg - 1) * 100) + '% danno, ricarica più breve. Usa 1 Arcanum (ne hai ' + n + ').' };
-      return { name: fuseName(a, b), icon: ARCANUM.icon, fw: [a, b], badge: 'FUSIONE', kind: 'Arcanum [?]', fuse: true,
-        desc: 'Diventano un\'arma sola: si libera un posto, +' + Math.round((F.dmg - 1) * 100) + '% danno, -' + Math.round((1 - F.cd) * 100) + '% ricarica, +area e +1 colpo. Usa 1 Arcanum (ne hai ' + n + ').' };
+      const a = findWeapon(o.id), b = findWeapon(o.id2), F = FUSION, sp = fuseRecipe(a, b);
+      return { name: sp.name, icon: RECIPE.icon, fw: [a, b], badge: 'FUSIONE', kind: baseWeaponName(a) + ' + ' + baseWeaponName(b), fuse: true,
+        desc: sp.desc + ' In più: un posto libero, +' + Math.round((F.dmg - 1) * 100) + '% danno, ricarica più breve.' };
     }
     if (o.type === 'wup') {
       const w = findWeapon(o.id), d = w.def;
@@ -94,7 +91,7 @@ const Upgrades = {
     else if (o.type === 'wup') levelUpWeapon(findWeapon(o.id));
     else if (o.type === 'evo') { evolveWeapon(findWeapon(o.id)); G.rs.evos++; }
     else if (o.type === 'fuse') {
-      if ((Save.data.arcana || 0) > 0 && fuseWeapons(findWeapon(o.id), findWeapon(o.id2))) { Save.data.arcana--; Save.write(); }
+      fuseWeapons(findWeapon(o.id), findWeapon(o.id2));
     }
     else if (o.type === 'passive') { if (!Player.passiveLevel(o.id)) Player.passives.push({ id: o.id, def: PASSIVE_DEFS[o.id], level: 1 }); Player.recalcStats(); }
     else if (o.type === 'pup') { for (const p of Player.passives) if (p.id === o.id) p.level++; Player.recalcStats(); }

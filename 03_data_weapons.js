@@ -313,6 +313,49 @@ const WEAPON_DEFS = {
     },
     r0: 14, phi: 1.6180339887,
   },
+
+  // RUOTA DELLA FORTUNA — una ruota d'oro che rimbalza da un dannato all'altro (bounces = quanti rimbalzi),
+  // e a ogni rimbalzo colpisce più forte (bounceDmg). Cerca il prossimo entro bounceR.
+  wheel: {
+    name: 'Rota Fortunae', icon: 'ico_wheel',
+    desc: '"Vostro saver non ha contasto a lei." Una ruota che rimbalza da un dannato all\'altro e a ogni rimbalzo colpisce più forte.',
+    levels: [
+      { dmg: 22, cd: 1.2,  amount: 2, speed: 420, bounces: 4, size: 1.0 },
+      { dmg: 22, cd: 1.2,  amount: 2, speed: 420, bounces: 6, size: 1.0 },
+      { dmg: 30, cd: 1.1,  amount: 3, speed: 440, bounces: 6, size: 1.1 },
+      { dmg: 30, cd: 0.95, amount: 3, speed: 440, bounces: 8, size: 1.1 },
+      { dmg: 40, cd: 0.8,  amount: 4, speed: 460, bounces: 10, size: 1.2 },
+    ],
+    upDesc: ['', '+2 rimbalzi', '+danno, +1 ruota', '+2 rimbalzi, più frequente', '+danno, +1 ruota, +2 rimbalzi'],
+    evo: {
+      passive: 'greed', name: 'Ministra e Duce', icon: 'ico_wheel',
+      desc: '"General ministra e duce." Ruote che non smettono di girare: 16 rimbalzi.',
+      stats: { dmg: 55, cd: 0.65, amount: 6, speed: 500, bounces: 16, size: 1.35 },
+    },
+    life: 1.3, bounceR: 220, bounceDmg: 1.1, kb: 40,
+  },
+
+  // TRIBOLI — chiodi a quattro punte sparsi dietro di te: chi ci passa sopra si ferisce e rallenta (slow = velocità
+  // che gli resta, per slowT secondi). Sono pozze (Zones) piccole: colpiscono ogni `tick` di WEAPON_DEFS.acid.
+  // L'evoluzione li affoga nella pece: pozze nere, larghe, che invischiano molto di più.
+  caltrops: {
+    name: 'Tribuli', icon: 'ico_caltrop',
+    desc: '"Festina lente." Triboli dietro di te: feriscono e rallentano chi li calpesta.',
+    levels: [
+      { dmg: 8,  cd: 1.4,  amount: 2, area: 14, dur: 4.0, slow: 0.6 },
+      { dmg: 8,  cd: 1.4,  amount: 3, area: 14, dur: 4.0, slow: 0.6 },
+      { dmg: 11, cd: 1.3,  amount: 3, area: 16, dur: 4.5, slow: 0.55 },
+      { dmg: 11, cd: 1.15, amount: 4, area: 16, dur: 5.0, slow: 0.55 },
+      { dmg: 15, cd: 1.0,  amount: 5, area: 18, dur: 5.5, slow: 0.5 },
+    ],
+    upDesc: ['', '+1 tribolo', '+danno, rallentano di più', '+1 tribolo, più frequenti e lunghi', '+danno, +1 tribolo'],
+    evo: {
+      passive: 'armor', name: 'Pegola Spessa', icon: 'ico_caltrop',
+      desc: '"Bollia là giuso una pegola spessa." Pozze di pece bollente che invischiano i dannati.',
+      stats: { dmg: 30, cd: 0.9, amount: 5, area: 32, dur: 6.0, slow: 0.25, pitch: 1 },
+    },
+    back: 20, spread: 34, slowT: 0.7,
+  },
 };
 
 // ----------------------------------------------------------------------------
@@ -342,24 +385,27 @@ const EVO_NEON = '#c8ff1e';
 // RILANCIO — nel level up puoi rilanciare le 3 carte se non ti piacciono (tasto R o il bottone). Tot per partita.
 const REROLL = { perRun: 3 };
 
-// FUSIONE — con un Arcanum [?] (lo vende il Magister) due armi al massimo (Lv 5 o evolute) si fondono in una:
-// occupano UN solo posto (se ne libera uno), sparano entrambe e diventano più forti. La carta esce nel level up.
+// FUSIONE — SOLO le coppie di FUSION_SPECIAL (qui sotto). Ogni ricetta si compra UNA volta dal Magister (RECIPE),
+// poi in partita si batte il suo Custode (TRIAL) e resta sbloccata per sempre. Da lì, in ogni partita, con le due armi
+// al massimo (Lv 5 o evolute) esce la carta FUSIONE: diventano una terza arma col suo nome e il suo effetto, occupano
+// UN solo posto, sparano entrambe e diventano più forti. Due armi qualsiasi non si fondono.
 //   dmg / cd = moltiplicatori su danno e ricarica | area = su raggio, gittata, area e grandezza | amount = colpi in più
 const FUSION = { dmg: 1.5, cd: 0.8, area: 1.15, amount: 1, areaKeys: ['radius', 'range', 'area', 'size', 'reach', 'width', 'height', 'splash'] };
 const FUSE_NEON = '#ff4fd8';   // magenta: bordo delle armi fuse (HUD, carte, resoconto)
 
-// FUSIONI UNICHE — 5 coppie, oltre ai potenziamenti normali, hanno un nome e un effetto tutto loro.
+// FUSIONI (ricette) — le uniche 5 coppie che si fondono: nome ed effetto tutto loro, più i potenziamenti di FUSION.
+// custode = chi va battuto per sbloccarla (nome, `art` = aspetto di un boss di mappa, `summon` = servi che evoca).
 // Chiave = i due id in ordine alfabetico (fuseKey). `fx` = quale effetto (lo leggono i ganci in 20_weapons.js).
 const FUSION_SPECIAL = {
-  'lightning+wisps': { name: 'Fulmini di Capaneo', fx: 'capaneo', chain: 3, chainDmg: 0.6, every: 0.12,
+  'lightning+wisps': { name: 'Fulmini di Capaneo', custode: { name: "L'Ombra di Capaneo", art: 'capaneo', summon: 'ghost' },  fx: 'capaneo', chain: 3, chainDmg: 0.6, every: 0.12,
     desc: '"Qual io fui vivo, tal son morto." Ogni scoppio di fiamma lancia un fulmine a catena.' },
-  'frost+storm':     { name: 'Vento di Lucifero', fx: 'lucifero', freeze: 1.0,
+  'frost+storm':     { name: 'Vento di Lucifero', custode: { name: "L'Ombra di Lucifero", art: 'lucifero', summon: 'gelido' },  fx: 'lucifero', freeze: 1.0,
     desc: '"Quindi Cocito tutto s\'aggelava." I turbini congelano chi trascinano.' },
-  'acid+bomb':       { name: 'Sabbione Ardente', fx: 'sabbione', dur: 2.5, dmgK: 0.35, rK: 0.85,
+  'acid+bomb':       { name: 'Sabbione Ardente', custode: { name: "L'Ombra di Gerione", art: 'gerione', summon: 'furia' },  fx: 'sabbione', dur: 2.5, dmgK: 0.35, rK: 0.85,
     desc: '"Sovra tutto \'l sabbion, d\'un cader lento." Ogni esplosione lascia una pozza di fuoco.' },
-  'dart+lightning':  { name: 'Strali di Giove', fx: 'giove', chance: 0.25, dmgK: 1.0, area: 34,
+  'dart+lightning':  { name: 'Strali di Giove', custode: { name: "L'Ombra di Anteo", art: 'anteo', summon: 'heavy' },  fx: 'giove', chance: 0.25, dmgK: 1.0, area: 34,
     desc: '"Folgore e saetta." Un cristallo su quattro chiama un fulmine sul bersaglio.' },
-  'frost+orbit':     { name: 'Stelle di Cocito', fx: 'stelle', freeze: 0.8,
+  'frost+orbit':     { name: 'Stelle di Cocito', custode: { name: 'L\'Ombra della Lonza', art: 'lonza', summon: 'lupa' },  fx: 'stelle', freeze: 0.8,
     desc: '"E quindi uscimmo a riveder le stelle." Le ampolle congelano chi toccano.' },
 };
 function fuseKey(a, b) { return a < b ? a + '+' + b : b + '+' + a; }

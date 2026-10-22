@@ -17,6 +17,7 @@ const Boss = {
   active: false, idx: -1, kind: -1,
   spawned1: false, warned1: false, spawnedTrio: false, warnedTrio: false, warnedWin: false,
   duoT: 0, spawnedDuo: false, warnedDuo: false,   // duoT = secondo di arrivo dei due guardiani (lo fissa continueEndless)
+  trialT: 0, trialWarned: false,                   // Custode delle fusioni: quando arriva il prossimo (TRIAL)
   endlessT: 0, endlessN: 0,
   hp: 0, maxHp: 1,
   reset() {
@@ -24,6 +25,7 @@ const Boss = {
     this.spawned1 = this.warned1 = this.spawnedTrio = this.warnedTrio = this.warnedWin = false;
     this.duoT = 0; this.spawnedDuo = this.warnedDuo = false;
     this.endlessT = 0; this.endlessN = 0;
+    this.trialT = TRIAL.time; this.trialWarned = false;
     Strikes.n = 0;
   },
   // aggiorna i campi di comodo dopo ogni cambio della lista
@@ -37,10 +39,15 @@ const Boss = {
     for (let k = 0; k < this.n; k++) if (this.list[k] === i) return this.slots[k];
     return null;
   },
+  // c'è un boss di questo tipo? (i Custodi delle fusioni non contano: non sono il boss vero)
   has(type) {
-    for (let k = 0; k < this.n; k++) if (this.slots[k].kind === type) return true;
+    for (let k = 0; k < this.n; k++) if (this.slots[k].kind === type && !this.slots[k].trial) return true;
     return false;
   },
+  // boss "veri" vivi (senza i Custodi)
+  main() { let c = 0; for (let k = 0; k < this.n; k++) if (!this.slots[k].trial) c++; return c; },
+  // Custodi vivi
+  trials() { return this.n - this.main(); },
   // vita sommata di tutti i boss vivi (per la barra)
   sumHp() {
     const E = Enemies;
@@ -51,29 +58,32 @@ const Boss = {
   // dopo Enemies.compact gli indici cambiano
   remap(map) { for (let k = 0; k < this.n; k++) this.list[k] = map[this.list[k]]; this.sync(); },
 };
-for (let k = 0; k < Boss.MAX; k++) Boss.slots.push({ kind: -1, uid: 0, cfg: {}, state: 'walk', t: 0, dirX: 0, dirY: 0, summonT: 0, volley: 0, spiralT: 0, spiralA: 0, shotT: 0 });
+for (let k = 0; k < Boss.MAX; k++) Boss.slots.push({ kind: -1, uid: 0, cfg: {}, trial: null, state: 'walk', t: 0, dirX: 0, dirY: 0, summonT: 0, volley: 0, spiralT: 0, spiralA: 0, shotT: 0 });
 
 // boss minore / maggiore della mappa in corso (nome, sprite, varianti); null per Flegiàs
 function bossCfg(type) { return type === ET.boss2 ? G.map.b2 : type === ET.boss3 ? G.map.b3 : null; }
 function bossName(type) { const c = bossCfg(type); return c ? c.name : ENEMY_DEFS[type].name; }
+// nome del boss di uno slot (i Custodi hanno il loro)
+function slotName(S) { return S.cfg.name || bossName(S.kind); }
 // nomi di tutti i boss vivi ("Flegiàs, Caronte e Minosse")
 function bossNames() {
   const B = Boss;
   if (B.n === 0) return bossName(ET.boss);
   let s = '';
-  for (let k = 0; k < B.n; k++) s += (k === 0 ? '' : k === B.n - 1 ? ' e ' : ', ') + bossName(B.slots[k].kind);
+  for (let k = 0; k < B.n; k++) s += (k === 0 ? '' : k === B.n - 1 ? ' e ' : ', ') + slotName(B.slots[k]);
   return s;
 }
 
-function spawnBoss(type, quiet) {
-  if (Boss.n >= Boss.MAX) return;
-  if (type === ET.boss) Boss.spawned1 = true;
+// cfg = aspetto/servi/nome diversi (i Custodi delle fusioni); trial = chiave della ricetta del Custode
+function spawnBoss(type, quiet, cfg, trial) {
+  if (Boss.n >= Boss.MAX) return -1;
+  if (type === ET.boss && !trial) Boss.spawned1 = true;
   const p = ringPoint(ENEMY_DEFS[type].r + 20);
   const i = spawnEnemy(type, p.x, p.y);
-  if (i < 0) return;
+  if (i < 0) return -1;
   const S = Boss.slots[Boss.n];
   Boss.list[Boss.n++] = i;
-  S.kind = type; S.uid = Enemies.uid[i]; S.cfg = bossCfg(type) || {};
+  S.kind = type; S.uid = Enemies.uid[i]; S.cfg = cfg || bossCfg(type) || {}; S.trial = trial || null;
   S.state = 'walk'; S.volley = 0;
   S.t = type === ET.boss ? BOSS.chargeEvery : type === ET.boss2 ? BOSS2.strikeEvery : BOSS3.burstEvery;
   S.spiralT = 0; S.spiralA = 0; S.shotT = 0;
@@ -81,8 +91,22 @@ function spawnBoss(type, quiet) {
   Boss.sync();
   addShake(6);
   Sfx.play('warn');
-  if (!quiet) UI.toast('Errore critico', bossName(type) + ' è arrivato.', 4);
+  if (!quiet) UI.toast('Errore critico', slotName(S) + ' è arrivato.', 4);
   UI.showBoss(true);
+  return i;
+}
+
+// CUSTODE di una ricetta di fusione comprata: un Flegiàs più piccolo con l'aspetto e i servi suoi (FUSION_SPECIAL[key].custode)
+function spawnTrial(key) {
+  const sp = FUSION_SPECIAL[key], c = sp.custode;
+  const cfg = { name: c.name, sprite: 'boss_' + c.art, summon: c.summon, faces: c.faces };
+  const i = spawnBoss(ET.boss, true, cfg, key);
+  if (i < 0) return false;
+  const E = Enemies;
+  E.hp[i] = E.maxHp[i] = E.maxHp[i] * TRIAL.hp;
+  E.dmg[i] *= TRIAL.dmg;
+  UI.toast('Prova del Magister', c.name + ' custodisce ' + sp.name + '. Battila e la fusione è tua per sempre.', 6, true);
+  return true;
 }
 
 // i due guardiani della mappa insieme (subito dopo la vittoria, se continui)
@@ -102,9 +126,11 @@ function spawnBossTrio() {
 
 function onBossKilled(i) {
   const E = Enemies, x = E.x[i], y = E.y[i], type = E.type[i], id = ENEMY_DEFS[type].id;
+  let name = bossName(type), trial = null;
   // toglie il boss dalla lista (scambio con l'ultimo: anche lo stato segue)
   for (let k = 0; k < Boss.n; k++) {
     if (Boss.list[k] !== i) continue;
+    name = slotName(Boss.slots[k]); trial = Boss.slots[k].trial;
     Boss.n--;
     const s = Boss.slots[k];
     Boss.list[k] = Boss.list[Boss.n]; Boss.slots[k] = Boss.slots[Boss.n]; Boss.slots[Boss.n] = s;
@@ -112,6 +138,18 @@ function onBossKilled(i) {
   }
   Boss.sync();
   if (type === ET.boss2 && !Boss.has(ET.boss2)) Strikes.n = 0;
+  if (trial) {
+    // CUSTODE battuto: la ricetta è sbloccata per sempre (niente forziere né pietra: il premio è la fusione)
+    Save.data.recipes[trial] = 2; Save.write();
+    Boss.trialT = G.time + TRIAL.gap; Boss.trialWarned = false;
+    G.hitStop = 0.3; Sfx.play('bossDie'); Sfx.play('fuse'); addShake(6);
+    for (let k = 0; k < 20; k++) { const a = Math.random() * 6.283, d = 20 + Math.random() * 90; spawnGem(x + Math.cos(a) * d, y + Math.sin(a) * d, 5, GK.XP); }
+    spawnGem(x, y, CFG.drops.healAmount, GK.HEAL);
+    spawnFx(FXK.RING, x, y, 0.6, 160);
+    UI.showBoss(Boss.n > 0);
+    UI.toast('Fusione sbloccata', name + ' è svanita. ' + FUSION_SPECIAL[trial].name + ' è tua: porta al massimo le due armi e fondile dal level up.', 7, true);
+    return;
+  }
   G.rs.bosses[id] = (G.rs.bosses[id] || 0) + 1;
   G.hitStop = 0.3;
   Sfx.play('bossDie');
@@ -134,7 +172,7 @@ function onBossKilled(i) {
   }
   addShake(6);
   UI.showBoss(Boss.n > 0);
-  UI.toast('Operazione completata', bossName(type) + ' è stato dissolto.' + (Boss.n > 0 ? ' Ne restano ' + Boss.n + '.' : ''), 4);
+  UI.toast('Operazione completata', name + ' è stato dissolto.' + (Boss.n > 0 ? ' Ne restano ' + Boss.n + '.' : ''), 4);
 }
 
 function bossWalk(i, dt, d, dx, dy) {
@@ -238,10 +276,10 @@ function updateBoss(i, dt) {
     S.summonT -= dt;
     if (S.summonT <= 0) {
       S.summonT = BOSS.summonEvery;
-      const n = BOSS.summonCount, rr = E.r[i] + 24;
+      const n = S.trial ? BOSS.summonCount >> 1 : BOSS.summonCount, rr = E.r[i] + 24, st = S.cfg.summon ? ET[S.cfg.summon] : ET.drop;
       for (let k = 0; k < n; k++) {
         const a = k / n * 6.283;
-        spawnEnemy(ET.drop, E.x[i] + Math.cos(a) * rr, E.y[i] + Math.sin(a) * rr);
+        spawnEnemy(st, E.x[i] + Math.cos(a) * rr, E.y[i] + Math.sin(a) * rr);
       }
     }
     if (S.t <= 0 && d < G.viewW * 0.75) { S.state = 'tell'; S.t = BOSS.tell; addShake(2); }

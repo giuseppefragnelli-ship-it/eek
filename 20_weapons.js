@@ -8,8 +8,8 @@
 // (o dell'evoluzione).
 // ============================================================================
 
-const PK = { SALT: 0, BOMB: 1, SCYTHE: 2, ACID: 3, WISP: 4, ARROW: 5, AXE: 6, STORM: 7, HELIX: 8 };
-const PROJ_SPRITE = ['proj_salt', 'bomb', 'proj_scythe', 'flask', 'wisp', 'proj_arrow', 'proj_axe', null, null];
+const PK = { SALT: 0, BOMB: 1, SCYTHE: 2, ACID: 3, WISP: 4, ARROW: 5, AXE: 6, STORM: 7, HELIX: 8, WHEEL: 9 };
+const PROJ_SPRITE = ['proj_salt', 'bomb', 'proj_scythe', 'flask', 'wisp', 'proj_arrow', 'proj_axe', null, null, 'proj_wheel'];
 
 const QBUF_ORB = new Int32Array(512);
 
@@ -44,7 +44,7 @@ function evolveWeapon(w) {
   if (w.fx) fuseCalc(w);   // già fusa: le statistiche potenziate ripartono da quelle dell'evoluzione
 }
 
-// ---- FUSIONE (Arcanum [?]) ------------------------------------------------------
+// ---- FUSIONE: solo le coppie di FUSION_SPECIAL sbloccate (ricetta + Custode) ------
 // Le due armi restano due oggetti in Player.weapons (gli indici `slot` dei proiettili non cambiano):
 // la prima tiene il posto (w.fusedWith = l'altra), la seconda sparisce dalla HUD (w.fusedInto = la prima).
 function fuseCalc(w) {
@@ -57,18 +57,20 @@ function fuseCalc(w) {
 }
 // armi che si possono fondere: al massimo, non dell'Armaiolo, non già fuse
 function fusable(w) { return !w.gear && !w.fusedWith && !w.fusedInto && wMaxed(w); }
-// coppie fondibili (solo al level up: qui allocare va bene)
+// c'è una ricetta (FUSION_SPECIAL) per queste due armi? Solo quelle si fondono
+function fuseRecipe(a, b) { return FUSION_SPECIAL[fuseKey(a.id, b.id)] || null; }
+// coppie fondibili: entrambe al massimo E con una ricetta sbloccata (comprata + Custode battuto). Solo al level up: allocare va bene
 function fusionPairs() {
   const ws = Player.weapons.filter(fusable), out = [];
-  for (let i = 0; i < ws.length; i++) for (let j = i + 1; j < ws.length; j++) out.push([ws[i], ws[j]]);
+  for (let i = 0; i < ws.length; i++) for (let j = i + 1; j < ws.length; j++) if (fuseRecipe(ws[i], ws[j]) && Save.recipeOpen(fuseKey(ws[i].id, ws[j].id))) out.push([ws[i], ws[j]]);
   return out;
 }
 function fuseWeapons(a, b) {
-  if (!fusable(a) || !fusable(b) || a === b) return false;
+  if (!a || !b || !fusable(a) || !fusable(b) || a === b || !fuseRecipe(a, b) || !Save.recipeOpen(fuseKey(a.id, b.id))) return false;
   if (b.slot < a.slot) { const t = a; a = b; b = t; }   // tiene il posto quella più a sinistra nella HUD
   a.fusedWith = b; b.fusedInto = a;
-  a.special = b.special = FUSION_SPECIAL[fuseKey(a.id, b.id)] || null;   // fusione unica (o nessuna)
-  if (a.special) { Save.data.fusions[fuseKey(a.id, b.id)] = true; Save.write(); }
+  a.special = b.special = fuseRecipe(a, b);   // la ricetta: nome ed effetto della terza arma
+  Save.data.fusions[fuseKey(a.id, b.id)] = true; Save.write();
   fuseCalc(a); fuseCalc(b);
   a.timer = b.timer = 0.2;
   spawnFx(FXK.RING, Player.x, Player.y, 0.5, 120);
@@ -199,9 +201,62 @@ function updateZones(dt) {
     if (Z.tick[i] > 0) continue;
     Z.tick[i] = tick;
     G.src = Z.src[i] >= 0 ? Player.weapons[Z.src[i]] : null;
-    damageArea(Z.x[i], Z.y[i], Z.r[i], Z.dmg[i], 0, Z.slow[i] ? 0.6 : 0);
+    if (G.src && G.src.id === 'caltrops') caltropTick(i, G.src);
+    else damageArea(Z.x[i], Z.y[i], Z.r[i], Z.dmg[i], 0, Z.slow[i] ? 0.6 : 0);
   }
   G.src = null;
+}
+
+// TRIBOLI: chi è sopra la pozza si ferisce e rallenta (come il Gelo: frz = durata, frzM = velocità che resta).
+// Non accorcia un rallentamento più forte che ha già (Gelo, ghiaccio delle fusioni).
+function caltropTick(i, w) {
+  const Z = Zones, E = Enemies, st = wStats(w), D = w.def, x = Z.x[i], y = Z.y[i], r = Z.r[i], slow = st.slow;
+  const n = Grid.query(x, y, r + CFG.MAX_ENEMY_R, QBUF_AOE);
+  for (let k = 0; k < n; k++) {
+    const j = QBUF_AOE[k];
+    if (E.alive[j] === 0) continue;
+    const dx = E.x[j] - x, dy = E.y[j] - y, rr = r + E.r[j];
+    if (dx * dx + dy * dy >= rr * rr) continue;
+    if (!(E.frz[j] > 0 && E.frzM[j] < slow)) { E.frz[j] = D.slowT; E.frzM[j] = slow; }
+    damageEnemy(j, Z.dmg[i], 0, 0, 0);
+  }
+  for (let q = Boss.n - 1; q >= 0; q--) {
+    const b = Boss.list[q];
+    if (E.alive[b] !== 0) { const dx = E.x[b] - x, dy = E.y[b] - y, rr = r + E.r[b]; if (dx * dx + dy * dy < rr * rr) damageEnemy(b, Z.dmg[i], 0, 0, 0); }
+  }
+}
+
+// ROTA FORTUNAE: dopo un colpo la ruota punta il dannato più vicino che non ha appena colpito (entro bounceR)
+// e colpisce più forte. Cerca con la Grid (più i boss, che non ci sono). Niente allocazioni.
+const QBUF_WHEEL = new Int32Array(512);
+function wheelBounce(i, from) {
+  const P = Projectiles, E = Enemies, D = WEAPON_DEFS.wheel, x = E.x[from], y = E.y[from], BR = D.bounceR;
+  const h0 = P.h0[i], h1 = P.h1[i], h2 = P.h2[i], h3 = P.h3[i];
+  let best = -1, bd = BR * BR;
+  const n = Grid.query(x, y, BR, QBUF_WHEEL);
+  for (let k = 0; k < n; k++) {
+    const j = QBUF_WHEEL[k];
+    if (j === from || E.alive[j] === 0) continue;
+    const u = E.uid[j];
+    if (u === h0 || u === h1 || u === h2 || u === h3) continue;
+    const dx = E.x[j] - x, dy = E.y[j] - y, d2 = dx * dx + dy * dy;
+    if (d2 < bd) { bd = d2; best = j; }
+  }
+  for (let q = 0; q < Boss.n; q++) {
+    const b = Boss.list[q];
+    if (b === from || E.alive[b] === 0) continue;
+    const u = E.uid[b];
+    if (u === h0 || u === h1 || u === h2 || u === h3) continue;
+    const dx = E.x[b] - x, dy = E.y[b] - y, d = Math.sqrt(dx * dx + dy * dy) - E.r[b] * 0.8, d2 = d > 0 ? d * d : 0;
+    if (d2 < bd) { bd = d2; best = b; }
+  }
+  if (best < 0) return;
+  const dx = E.x[best] - P.x[i], dy = E.y[best] - P.y[i], d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const sp = Math.sqrt(P.vx[i] * P.vx[i] + P.vy[i] * P.vy[i]);
+  P.dx[i] = dx / d; P.dy[i] = dy / d; P.vx[i] = P.dx[i] * sp; P.vy[i] = P.dy[i] * sp;
+  P.life[i] = P.life0[i];
+  P.dmg[i] *= D.bounceDmg;
+  spawnFx(FXK.SPARK, x, y, 0.16, 0);
 }
 
 const QBUF_SLASH = new Int32Array(1024);
@@ -562,6 +617,38 @@ const WEAPON_LOGIC = {
     Sfx.play('helix');
   },
 
+  // Rota Fortunae: `amount` ruote, ognuna verso un dannato diverso (il più vicino libero), poi rimbalzano da sole.
+  wheel(w, dt) {
+    w.timer -= dt;
+    if (w.timer > 0) return;
+    const st = wStats(w), D = w.def;
+    w.timer = st.cd * Player.cdMult;
+    const n = Math.min(8, amt(st)), sz = st.size * Player.areaMult;
+    for (let k = 0; k < n; k++) {
+      const t = nearestEnemy(Player.x, Player.y, 420, w.targets, k);
+      let dx, dy;
+      if (t >= 0) { w.targets[k] = Enemies.uid[t]; dx = Enemies.x[t] - Player.x; dy = Enemies.y[t] - Player.y; }
+      else { const a = Math.random() * 6.2832; dx = Math.cos(a); dy = Math.sin(a); w.targets[k] = -1; }
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      spawnProjectile(PK.WHEEL, Player.x, Player.y, dx / d, dy / d, st.speed, st.dmg * Player.dmgMult, 8 * sz, sz, D.life, st.bounces + 1, D.kb);
+    }
+    Sfx.play('helix');
+  },
+
+  // Triboli: `amount` triboli sparsi dietro di te (dalla parte opposta a dove vai).
+  caltrops(w, dt) {
+    w.timer -= dt;
+    if (w.timer > 0) return;
+    const st = wStats(w), D = w.def;
+    w.timer = st.cd * Player.cdMult;
+    const n = amt(st), r = st.area * Player.areaMult, dmg = st.dmg * Player.dmgMult;
+    const bx = Player.x - Player.dirX * D.back, by = Player.y - Player.dirY * D.back;
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * 6.2832, d = Math.random() * D.spread;
+      spawnZone(bx + Math.cos(a) * d, by + Math.sin(a) * d, r, st.dur, dmg, true);
+    }
+  },
+
   // Gelo: `amount` onde di ghiaccio, una ogni `gap` secondi.
   frost(w, dt) {
     const st = wStats(w);
@@ -776,6 +863,7 @@ function projHit(i, j, x, y, r) {
   P.hn[i]++;
   damageEnemy(j, P.dmg[i], P.dx[i], P.dy[i], P.kb[i]);
   if (P.kind[i] === PK.WISP) wispBurst(i, E.x[j], E.y[j]);
+  else if (P.kind[i] === PK.WHEEL && P.pierce[i] > 1) wheelBounce(i, j);
   else if (P.kind[i] === PK.SALT && G.src && G.src.special && G.src.special.fx === 'giove' && Math.random() < G.src.special.chance) {
     // STRALI DI GIOVE: il cristallo chiama un fulmine dal cielo sul bersaglio
     const sp = G.src.special, ex = E.x[j], ey = E.y[j], a = sp.area * Player.areaMult;
