@@ -7,7 +7,7 @@
 // MONSTER_RECTS: nome sprite -> [x, y, w, h, guarda a destra (1) / di fronte (0)]
 // Se l'immagine non si carica, il gioco usa gli sprite di prima.
 // ============================================================================
-const MONSTER_ATLAS = 'assets/monsters.png';   // immagine separata (prima era incollata qui come testo)
+const MONSTER_ATLAS = 'monsters.png';   // immagine separata (prima era incollata qui come testo)
 const MONSTER_RECTS = {"boss_primal":[0,0,286,296,0],"boss_minosse":[287,0,216,296,0],"boss_minotauro":[504,0,248,296,0],"boss_caronte":[753,0,308,284,0],"boss_capaneo":[1062,0,194,284,0],"boss_lonza":[1257,0,222,284,1],"boss_medusa":[1480,0,210,284,0],"boss_anteo":[1691,0,332,284,0],"boss_pluto":[0,297,270,272,0],"boss_lupa":[271,297,332,262,1],"boss_cerbero":[604,297,332,250,1],"boss_storm":[937,297,304,244,0],"boss_lucifero":[1242,297,340,218,0],"boss_gerione":[1583,297,332,210,0],"boss_black":[0,570,304,206,0],"slime_elite":[305,570,74,88,0],"slime_heavy":[380,570,48,72,0],"slime_spitter":[429,570,70,70,1],"slime_gelido":[500,570,50,70,0],"slime_spitter_d":[551,570,44,70,0],"ghost_d":[596,570,78,70,0],"slime_heavy_d":[675,570,68,68,0],"ghost":[744,570,56,64,0],"slime_furia":[801,570,44,64,0],"slime_lupa":[846,570,76,60,1],"slime_fast_d":[923,570,64,48,0],"slime_toxic_d":[988,570,60,48,1],"slime_fast":[1049,570,64,42,0],"slime_toxic":[1114,570,48,34,0],"slime_drop_d":[1163,570,28,32,0],"slime_drop":[1192,570,30,20,0]};
 const MonsterArt = {
   img: null,

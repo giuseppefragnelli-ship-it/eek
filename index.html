@@ -3,12 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Slime 98">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>html,body{margin:0;padding:0;background:#050408}</style>
+<title>Slime Survivors 98</title>
 </head>
 <body>
-<title>Slime Survivors 98</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/game.css" charset="utf-8">
+<link rel="stylesheet" href="game.css" charset="utf-8">
 <!--
   SLIME SURVIVORS 98 — dove sta cosa
   css/game.css                    tutto l'aspetto (tema Windows 98, telefono)
@@ -66,6 +74,8 @@
   </div>
   <!-- SCATTO (solo touch) -->
   <button id="dashbtn" aria-label="Scatto"><span>SCATTO</span></button>
+  <!-- TELETRASPORTO (solo touch, dopo lo sblocco: resisti fino all'11:00 nella Palude) -->
+  <button id="telebtn" aria-label="Teletrasporto"><span>TELE</span></button>
   <!-- VILLAGGIO -->
   <div id="vbar" hidden></div>
   <div id="vprompt"><button class="btn default" data-act="talk"><span id="vprompt-text"></span></button></div>
@@ -119,6 +129,7 @@
                 <div class="map-thumb sunken"><img id="map-thumb"><div class="map-lock" id="map-lock"></div></div>
                 <div class="map-name" id="map-name"></div>
                 <div class="map-tags" id="map-tags"></div>
+                <div class="map-mode" id="map-mode" hidden></div>
                 <div class="map-desc" id="map-desc"></div>
               </div>
               <button class="btn arrow" data-act="map-next" aria-label="Mappa successiva">›</button>
@@ -313,31 +324,33 @@
 
 <!-- Script classici (non moduli), caricati in ordine qui sotto. Per provarlo in locale serve un server http (vedi playtest.py). -->
 
-<script src="js/01_config.js" charset="utf-8"></script>
-<script src="js/02_data_enemies.js" charset="utf-8"></script>
-<script src="js/03_data_weapons.js" charset="utf-8"></script>
-<script src="js/04_data_economy.js" charset="utf-8"></script>
-<script src="js/05_data_maps.js" charset="utf-8"></script>
-<script src="js/06_save.js" charset="utf-8"></script>
-<script src="js/07_audio.js" charset="utf-8"></script>
-<script src="js/08_sprites.js" charset="utf-8"></script>
-<script src="js/09_art_eek_frames.js" charset="utf-8"></script>
-<script src="js/10_art_characters.js" charset="utf-8"></script>
-<script src="js/11_art_bosses.js" charset="utf-8"></script>
-<script src="js/12_input.js" charset="utf-8"></script>
-<script src="js/13_grid.js" charset="utf-8"></script>
-<script src="js/14_entities.js" charset="utf-8"></script>
-<script src="js/15_world.js" charset="utf-8"></script>
-<script src="js/16_player.js" charset="utf-8"></script>
-<script src="js/17_enemies.js" charset="utf-8"></script>
-<script src="js/18_bosses.js" charset="utf-8"></script>
-<script src="js/19_enemy_ai.js" charset="utf-8"></script>
-<script src="js/20_weapons.js" charset="utf-8"></script>
-<script src="js/21_upgrades.js" charset="utf-8"></script>
-<script src="js/22_render.js" charset="utf-8"></script>
-<script src="js/23_ui.js" charset="utf-8"></script>
-<script src="js/24_village.js" charset="utf-8"></script>
-<script src="js/25_monster_art.js" charset="utf-8"></script>
-<script src="js/26_main.js" charset="utf-8"></script>
+<script src="01_config.js" charset="utf-8"></script>
+<script src="02_data_enemies.js" charset="utf-8"></script>
+<script src="03_data_weapons.js" charset="utf-8"></script>
+<script src="04_data_economy.js" charset="utf-8"></script>
+<script src="05_data_maps.js" charset="utf-8"></script>
+<script src="06_save.js" charset="utf-8"></script>
+<script src="07_audio.js" charset="utf-8"></script>
+<script src="08_sprites.js" charset="utf-8"></script>
+<script src="09_art_eek_frames.js" charset="utf-8"></script>
+<script src="10_art_characters.js" charset="utf-8"></script>
+<script src="11_art_bosses.js" charset="utf-8"></script>
+<script src="12_input.js" charset="utf-8"></script>
+<script src="13_grid.js" charset="utf-8"></script>
+<script src="14_entities.js" charset="utf-8"></script>
+<script src="15_world.js" charset="utf-8"></script>
+<script src="16_player.js" charset="utf-8"></script>
+<script src="17_enemies.js" charset="utf-8"></script>
+<script src="18_bosses.js" charset="utf-8"></script>
+<script src="19_enemy_ai.js" charset="utf-8"></script>
+<script src="20_weapons.js" charset="utf-8"></script>
+<script src="21_upgrades.js" charset="utf-8"></script>
+<script src="22_render.js" charset="utf-8"></script>
+<script src="23_ui.js" charset="utf-8"></script>
+<script src="24_village.js" charset="utf-8"></script>
+<script src="25_monster_art.js" charset="utf-8"></script>
+<script src="26_main.js" charset="utf-8"></script>
+
+
 </body>
 </html>

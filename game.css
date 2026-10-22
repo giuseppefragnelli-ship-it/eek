@@ -5,6 +5,8 @@
    ========================================================================== */
 :root {
   /* tetro, quasi nero, tinte scure; il fluo è riservato a cuore, calamita e monete */
+  --neon: #c8ff1e;        /* verde evidenziatore: solo i bordi delle armi evolute (= EVO_NEON) */
+  --fuse: #ff4fd8;        /* magenta: armi fuse con l'Arcanum [?] (= FUSE_NEON) */
   --bg: #050408;
   --face: #15131b;        /* superficie delle finestre */
   --face2: #1d1a25;
@@ -123,6 +125,10 @@ legend { padding: 0 3px; background: var(--face); color: var(--text); position: 
 
 /* ---------- carte level up ---------- */
 .lvl-head { margin-bottom: 8px; }
+.lvl-foot { display: flex; justify-content: center; margin-top: 8px; }
+#reroll-btn { min-width: 180px; }
+#reroll-btn b { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 4px; background: #000; color: var(--pale); }
+#reroll-btn:disabled b { color: var(--dim); }
 #cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .card {
   display: flex; flex-direction: column; align-items: stretch; text-align: left; height: auto; padding: 8px; gap: 6px;
@@ -140,8 +146,23 @@ legend { padding: 0 3px; background: var(--face); color: var(--text); position: 
 .card.sel, .card:hover { background: var(--sel); color: var(--pale); }
 .card.sel .cname, .card:hover .cname, .card.sel .cdesc, .card:hover .cdesc { color: var(--pale); }
 .card.sel .ckind, .card:hover .ckind, .card.sel .ckey, .card:hover .ckey { color: var(--text2); }
-.card.evo .badge { background: var(--accent); color: var(--pale); animation: blink 0.5s steps(1) infinite; }
-.card.sel.evo .badge, .card.evo:hover .badge { background: #000; color: var(--pale); }
+.card.evo { box-shadow: inset 0 0 0 1px var(--neon), inset -2px -2px var(--lo), inset 2px 2px var(--hi2), 0 0 6px rgba(200, 255, 30, .35); }
+.card.evo .badge { background: #000; color: var(--neon); box-shadow: inset 0 0 0 1px var(--neon); animation: blink 0.5s steps(1) infinite; }
+.card.sel.evo .badge, .card.evo:hover .badge { background: #000; color: var(--neon); }
+.card.evo .cname { color: var(--neon); }
+/* FUSIONE (Arcanum [?]): bordo magenta, le due armi sovrapposte + lo scrigno nell'angolo */
+.card.fuse { box-shadow: inset 0 0 0 1px var(--fuse), inset -2px -2px var(--lo), inset 2px 2px var(--hi2), 0 0 6px rgba(255, 79, 216, .35); }
+.card.fuse .badge { background: #000; color: var(--fuse); box-shadow: inset 0 0 0 1px var(--fuse); animation: blink 0.5s steps(1) infinite; }
+.card.sel.fuse .badge, .card.fuse:hover .badge { background: #000; color: var(--fuse); }
+.card.fuse .cname { color: var(--fuse); }
+.card .cimg.fimg { position: relative; }
+.card .cimg.fimg img { position: absolute; width: 24px; height: 24px; }
+.card .cimg.fimg .f1 { left: 2px; top: 2px; }
+.card .cimg.fimg .f2 { right: 2px; bottom: 2px; }
+.card .cimg.fimg .fq { width: 14px; height: 14px; right: -4px; top: -4px; }
+@media (max-width: 600px) { .card .cimg.fimg img { width: 19px; height: 19px; } .card .cimg.fimg .fq { width: 12px; height: 12px; } }
+/* ARMA SEGRETA: badge dorato */
+.card.secret .badge { background: #000; color: var(--fluo-coin); box-shadow: inset 0 0 0 1px #9c7a1a; }
 
 /* ---------- HUD ---------- */
 #hud { position: fixed; left: 0; right: 0; top: 0; display: none;
@@ -158,8 +179,13 @@ legend { padding: 0 3px; background: var(--face); color: var(--text); position: 
 .slot .pips { position: absolute; left: 3px; right: 3px; bottom: 3px; display: flex; gap: 1px; }
 .slot .pips i { flex: 1; height: 2px; background: var(--hi2); }
 .slot .pips i.on { background: var(--text); }
-.slot.evo { box-shadow: inset 0 0 0 1px var(--accent), inset -1px -1px var(--hi), inset 1px 1px var(--lo2); }
+/* evolute: cornice verde evidenziatore (solo il bordo, l'interno resta scuro) */
+.slot.evo { box-shadow: inset 0 0 0 1px var(--neon), 0 0 4px rgba(200, 255, 30, .45); }
 .slot.empty { opacity: .45; }
+.slot.fuse { box-shadow: inset 0 0 0 1px var(--fuse), 0 0 4px rgba(255, 79, 216, .5); }
+.slot.fuse img { position: absolute; width: 14px; height: 14px; margin: 0; }
+.slot.fuse .f1 { left: 3px; top: 3px; }
+.slot.fuse .f2 { right: 3px; bottom: 3px; }
 
 /* ---------- taskbar ---------- */
 #taskbar {
@@ -282,6 +308,8 @@ body.touch span.tc { display: inline; }
 .srow .btn { min-width: 92px; }
 .srow.locked .simg img { filter: brightness(.35); }
 .srow.sel { background: var(--sel); }
+.srow.arow { background: rgba(255, 79, 216, .06); box-shadow: inset 0 0 0 1px rgba(255, 79, 216, .35); margin-bottom: 4px; }
+.srow.arow .sname { color: var(--fuse); }
 .pricetag { display: inline-flex; align-items: center; gap: 3px; }
 .pricetag img { width: 11px; height: 11px; }
 .shop-msg { min-height: 18px; margin-top: 8px; font-weight: bold; }
@@ -334,6 +362,8 @@ body.touch span.tc { display: inline; }
 .wrow .wbar { grid-column: 2 / -1; height: 3px; background: #1d0508; }
 .wrow .wbar i { display: block; height: 100%; background: #a62a33; }
 #m-dead.win .wrow .wbar i { background: #9c7a1a; }
+.wrow.fuse .wn, .brow.fuse span { color: var(--fuse); }
+.wrow.fuse img, .brow.fuse img { filter: drop-shadow(0 0 2px rgba(255, 79, 216, .6)); }
 .end-record { margin-top: 10px; padding-top: 8px; border-top: 1px solid #2a0a10; color: #f4f0f0; font-weight: bold; text-align: center; }
 .end-buttons { display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 .end-buttons .btn { background: #1d0508; color: #f4f0f0;
@@ -388,7 +418,8 @@ body.touch span.tc { display: inline; }
 .crow b { color: var(--pale); margin-right: 6px; }
 .crow .cb { font-size: 11px; color: #d1a93a; font-weight: bold; }
 .crow .cd { font-size: 11px; color: var(--text2); }
-.crow.evo .cb { color: #b99be0; animation: blink .5s steps(1) infinite; }
+.crow.evo .cb { color: var(--neon); animation: blink .5s steps(1) infinite; }
+.crow.evo img, .wrow.evo img { filter: drop-shadow(0 0 2px rgba(200, 255, 30, .5)); }
 @keyframes crowin { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
 
 /* ---------- suggerimenti ---------- */
@@ -463,7 +494,7 @@ body.touch .card { min-height: 0; }
 :root { --pixel: "Silkscreen", "Lucida Console", "Courier New", monospace; --glow: #b07ae0; }
 
 /* i tocchi sui comandi non devono finire al joystick */
-#ui .hud-pause, #ui #dashbtn { pointer-events: auto; }
+#ui .hud-pause, #ui #dashbtn, #ui #telebtn { pointer-events: auto; }
 
 /* modali e schermata finale: mai sotto il notch, e se non ci stanno si scorrono (non si tagliano) */
 .modal { padding: 8px max(8px, env(safe-area-inset-right, 0px)) 8px max(8px, env(safe-area-inset-left, 0px));
@@ -508,6 +539,20 @@ body.touch #xpbar { height: 20px; }
 #dashbtn:active, #dashbtn.hit { transform: scale(.92); }
 #dashbtn.left { right: auto; left: calc(18px + env(safe-area-inset-left, 0px)); }
 body.touch.st-play #dashbtn { display: block; }
+
+/* ---------- tasto TELE (telefono, dopo lo sblocco del teletrasporto): sopra lo SCATTO, più piccolo ---------- */
+#telebtn { position: fixed; display: none; right: calc(26px + env(safe-area-inset-right, 0px)); bottom: calc(var(--taskbar-h) + 112px + env(safe-area-inset-bottom, 0px));
+  width: 58px; height: 58px; border-radius: 50%; border: 0; padding: 0; color: var(--pale); font: bold 9px var(--pixel); letter-spacing: 0;
+  background: radial-gradient(circle at 50% 42%, #1c4a52 0 52%, #0a1d22 53% 100%);
+  box-shadow: 0 0 0 2px #000, 0 0 0 3px #3d8c94, inset 0 0 0 4px rgba(0,0,0,.35); opacity: .82; touch-action: none; -webkit-user-select: none; }
+#telebtn::before { content: ''; position: absolute; inset: -5px; border-radius: 50%;
+  background: conic-gradient(#4fb3bd calc(var(--cd, 1) * 360deg), rgba(0,0,0,.55) 0); -webkit-mask: radial-gradient(circle, transparent 32px, #000 33px); mask: radial-gradient(circle, transparent 32px, #000 33px); }
+#telebtn span { position: relative; text-shadow: 1px 1px #000; }
+#telebtn.ready { opacity: .95; }
+#telebtn.ready span { color: #fff; }
+#telebtn:active, #telebtn.hit { transform: scale(.92); }
+#telebtn.left { right: auto; left: calc(26px + env(safe-area-inset-left, 0px)); }
+body.touch.st-play.has-tele #telebtn { display: block; }
 
 /* ==========================================================================
    MENU PRINCIPALE
@@ -575,6 +620,12 @@ body.touch.st-play #dashbtn { display: block; }
 .map-name { font: bold 13px var(--pixel); color: var(--pale); }
 .map-card.locked .map-name { color: var(--dim); }
 .map-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+/* modalità della mappa (Incubo / Facile, solo sul Cocito dopo lo sblocco) */
+.map-mode { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text2); }
+.map-mode[hidden] { display: none; }
+.map-mode span { margin-right: 2px; }
+.map-mode .btn.on { background: var(--sel); color: var(--pale); box-shadow: inset 1px 1px var(--lo), inset -1px -1px var(--hi2); }
+.map-mode .btn[data-act="mode-facile"].on { background: #4d1019; color: #fff; }
 .tag { font-size: 10px; font-weight: bold; padding: 1px 5px; background: #000; color: var(--text2); box-shadow: inset -1px -1px var(--hi2), inset 1px 1px var(--lo2); }
 .tag.won { color: #8fd16a; } .tag.coin { color: var(--fluo-coin); } .tag.rec { color: #b99be0; } .tag.danger { color: #e0717a; }
 .map-desc { color: var(--text2); font-size: 11px; line-height: 1.35; }
