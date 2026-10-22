@@ -43,6 +43,8 @@ const PAL = {
   J: '#070d05', V: '#0b1609', W: '#11200e', X: '#1a1108',
 };
 
+PAL['~'] = EVO_NEON;   // verde evidenziatore: SOLO il contorno delle armi evolute (vedi SPR.neon)
+
 // colore del lampo quando un nemico viene colpito (grigio-lilla, non bianco: il gioco resta cupo)
 const FLASH = '#8f88a8';
 
@@ -304,7 +306,9 @@ const SPR = {
       return d1 > 4.4 ? 'w' : '9';
     }, { rotate: true });
     this.fromRows('flask', ['..4..', '..8..', '.d8d.', 'deeed', 'deeed', 'deeed', '.ddd.']);
-    this.fromRows('wisp', ['...p...', '..pp...', '..p9p..', '.p99p..', '.p9w9p.', 'p9www9p', 'p9www9p', '.p999p.', '..ppp..']);
+    // Linguae Ignis: fiamma NERA, GIALLA e BIANCA (bordo quasi nero, corpo giallo, cuore bianco); evoluta: bordo bianco
+    this.fromRows('wisp', ['...1...', '..11...', '..1Y1..', '.1YY1..', '.1YZY1.', '1YZwZY1', '1YwwwY1', '.1YZY1.', '..111..']);
+    this.fromRows('wisp_evo', ['...w...', '..ww...', '..wYw..', '.wYYw..', '.wYZYw.', 'wYZwZYw', 'wYwwwYw', '.wYZYw.', '..www..']);
     for (const [ico, src] of [['ico_scythe', 'proj_scythe'], ['ico_acid', 'flask'], ['ico_wisp', 'wisp']]) { this.cache[ico] = this.cache[src]; this.url[ico] = this.url[src]; }
     this.fromFn('glob', 5, 5, this.circleFn(5, 'n', 'p', 'm'));
     this.fromFn('ebullet', 6, 6, this.circleFn(6, 'u', '9', 't'));
@@ -312,29 +316,7 @@ const SPR = {
     // BOSS FINALE
     this.fromFn('boss_primal', 152, 140, this.bossFn(152, 140, { eye: 'u', eyeCore: '9', mouth: 's', rim: 't', veins: 'r' }), { squash: true });
 
-    // VILLAGGIO: case (tetto colorato per mestiere), abitanti, pozzo, lanterne
-    const house = (roof, roofDark) => (x, y) => {
-      const W = 44, cx = 21.5;
-      if (y < 16) {
-        if (x >= 31 && x <= 34 && y >= 1 && y <= 9) return y === 1 ? '4' : '3';   // comignolo
-        const hw = (y + 1) / 16 * 22 + 1;
-        if (Math.abs(x - cx) > hw) return null;
-        if (Math.abs(x - cx) > hw - 1.2 || y === 15) return roofDark;
-        return y % 3 === 0 ? roofDark : roof;
-      }
-      if (x < 3 || x > W - 4) return null;
-      if (x >= 18 && x <= 25 && y >= 27) return x === 24 && y === 33 ? 'j' : (y === 27 ? 'g' : 'f');   // porta
-      if ((x >= 7 && x <= 13 || x >= 30 && x <= 36) && y >= 21 && y <= 27) {                 // finestre accese
-        if (x === 10 || x === 33 || y === 24) return 'f';
-        return (x + y) % 5 === 0 ? 'P' : 'G';
-      }
-      if (y === 39) return '1';
-      return (x % 6 === 0) ? '2' : (y % 4 === 0 ? '3' : '4');                               // assi di legno
-    };
-    this.fromFn('h_smith', 44, 40, house('C', 'B'));
-    this.fromFn('h_weapons', 44, 40, house('y', 'x'));
-    this.fromFn('h_armor', 44, 40, house('c', 'b'));
-    this.fromFn('h_inn', 44, 40, house('n', 'm'));
+    // VILLAGGIO: abitanti, pozzo, lanterne (le case sono in initVillage)
     this.fromRows('ico_mug', ['.9999..', '.jjjj..', '.jjjjhh', '.jjjj.h', '.jjjjhh', '.jjjj..', '.hhhh..']);
     this.fromRows('npc_smith', ['...SSSSS...', '..SSSSSSS..', '..SkSSSkS..', '..S66666S..', '...66666...', '.SS3hhh3SS.', 'SS33hhh33SS', 'S.33hhh33.S',
       '7.33hhh33.S', '7733hhh33..', '7.33hhh33..', '..3333333..', '..33...33..', '..33...33..', '..44...44..'], { mirror: true });
@@ -376,6 +358,8 @@ const SPR = {
     this.fromRows('ico_check', ['......e', '.....ee', 'e...ee.', 'ee.ee..', '.eee...', '..e....']);
     this.fromRows('ico_scroll', ['.8888888.', '899999998', '.9767679.', '.9999999.', '.9767679.', '.9999999.', '899999998', '.8888888.']);
     this.fromRows('proj_arrow', ['66......9..', 'hhhhhhhh9ww', '66......9..'], { rotate: true });
+    // freccia dell'Arciere nemico: grossa, impennaggio rosso, punta bianca (deve vedersi da lontano)
+    this.fromRows('eb_arrow', ['DDD............9......', '.DDD...........999....', '..DDD..........99999..', '..C8888888888889wwwwww', '..DDD..........99999..', '.DDD...........999....', 'DDD............9......'], { rotate: true });
     this.fromRows('proj_axe', ['..7999...', '.79ww99..', '.79w999h.', '..799.h..', '.....h...', '....h....', '...h.....', '..h......', '.i.......'], { rotate: true });
 
     this.fromRows('well', ['..6666666666..', '.677777777776.', '67qqqqqqqqqq76', '67qrrrrrrrrq76', '.677777777776.', '.556565656555.', '.565656565655.', '.555555555555.', '..4444444444..']);
@@ -390,73 +374,229 @@ const SPR = {
       const rect = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, c); };
       return { g, set, rect };
     };
-    // CASETTA: tetto a tegole, muri a graticcio, finestre accese con fioriere, porta ad arco, comignolo.
-    // roof = [chiaro, medio, scuro]; wall = intonaco; kind = extra del mestiere
-    const house = (name, roof, wall, kind) => {
-      const W = 60, H = 62, { g, set, rect } = mk(W, H);
-      const [R1, R2, R3] = roof;
-      // comignolo (dietro al tetto)
-      rect(42, 2, 47, 16, kind === 'smith' ? '3' : '4'); rect(41, 1, 48, 2, '5');
-      for (let y = 4; y <= 16; y += 3) for (let x = 42; x <= 47; x++) if ((x + y) % 3 === 0) set(x, y, '2');
-      // tetto a capanna con tegole a scaglie
-      for (let y = 4; y <= 27; y++) {
-        const hw = Math.round((y - 4) / 23 * 30) + 1;
-        for (let x = 30 - hw; x <= 29 + hw; x++) {
-          const row = ((y - 4) / 3) | 0, edge = x === 30 - hw || x === 29 + hw;
-          let c = (y - 4) % 3 === 2 ? R3 : ((x + row * 2) % 4 === 0 ? R3 : (x < 30 ? R1 : R2));
-          if (edge || y === 27) c = R3;
-          set(x, y, c);
+    // CASE GIAPPONESI (2026-10-17, al posto delle casette a punta): tetti di coppi scuri con la gronda all'insù,
+    // legno, carta di riso accesa, lanterne. Il colore del mestiere sta su drappi, stendardi o tetti.
+    // Ogni edificio salva sullo sprite (coordinate dello sprite, contorno compreso):
+    //   e.sign  = [x, y, standing]  centro dell'insegna con l'icona (standing = su un palo, sennò appesa)
+    //   e.smoke = [x, y] | null      da dove esce il fumo
+    //   e.lamps = [[x, y], ...]      lanterne che fanno l'alone caldo
+    const COL = { magister: ['s', 't', 'u'], smith: ['B', 'C', 'D'], weapons: ['x', 'y', 'z'], armor: ['b', 'c', 'd'], inn: ['m', 'n', 'o'], haruspex: ['F', 'G', 'P'] };
+    const jp = (W, H) => {
+      const o = mk(W, H), { set, rect } = o;
+      o.lamps = [];
+      // tetto: x0..x1 = larghezza alla gronda (riga y1), rientro `inset` al colmo (riga y0); i fianchi curvano verso l'interno
+      o.roof = (x0, x1, y0, y1, inset, tile, rim) => {
+        const [T0, T1, T2] = tile || ['2', '3', '4'], RIM = rim || '6', mid = x0 + (x1 - x0) * 0.6;
+        for (let y = y0; y <= y1; y++) {
+          const t = (y - y0) / Math.max(1, y1 - y0), a = Math.round(inset * (1 - t * t)), L = x0 + a, R = x1 - a;
+          for (let x = L; x <= R; x++) {
+            let c = x < mid ? (x % 2 ? T1 : T2) : (x % 2 ? T0 : T1);       // file di coppi, luce da sinistra
+            if (x === L || x === R || y === y0 || y === y1 - 1) c = T0;
+            if (y === y1) c = RIM;
+            set(x, y, c);
+          }
         }
-      }
-      rect(28, 3, 31, 4, R3);                                                // colmo
-      // muri
-      const stone = kind === 'smith';
-      for (let y = 28; y <= 54; y++) for (let x = 4; x <= 55; x++) {
-        let c = wall;
-        if (stone) { const row = ((y - 28) / 4) | 0; c = (y - 28) % 4 === 3 || (x + (row & 1) * 4) % 8 === 0 ? '2' : ((x * 5 + y * 3) % 13 === 0 ? '4' : '3'); }
-        set(x, y, c);
-      }
-      rect(4, 28, 55, 28, '1');                                              // ombra sotto la gronda
-      if (!stone) {
-        // graticcio: travi scure
-        for (const bx of [4, 5, 29, 30, 54, 55]) rect(bx, 29, bx, 54, 'g');
-        rect(4, 41, 55, 41, 'g'); rect(4, 54, 55, 54, 'g');
-        for (let k = 0; k < 11; k++) { set(6 + k, 30 + k, 'g'); set(53 - k, 30 + k, 'g'); }
-      }
-      // finestre accese + scuri + fioriera
-      for (const wx of [10, 42]) {
-        rect(wx - 1, 31, wx + 8, 39, 'g');
-        rect(wx, 32, wx + 7, 38, 'G');
-        for (let y = 32; y <= 38; y++) for (let x = wx; x <= wx + 7; x++) if ((x + y) % 4 === 0) set(x, y, 'P');
-        rect(wx + 3, 32, wx + 4, 38, 'g'); rect(wx, 35, wx + 7, 35, 'g');
-        rect(wx - 3, 31, wx - 2, 39, R2); rect(wx + 9, 31, wx + 10, 39, R2);   // scuri del colore del tetto
-        rect(wx - 1, 40, wx + 8, 41, 'f');                                     // fioriera
-        for (let x = wx; x <= wx + 7; x += 2) set(x, 39, ['C', 'o', 'L', 'C'][(x >> 1) & 3]);
-      }
-      // porta ad arco con assi, maniglia e gradini
-      for (let y = 43; y <= 56; y++) for (let x = 25; x <= 34; x++) {
-        if (y < 46 && Math.abs(x - 29.5) > (y - 42) * 1.6 + 1) continue;
-        set(x, y, x === 25 || x === 34 || y === 43 ? 'f' : ((x - 25) % 3 === 0 ? 'g' : 'h'));
-      }
-      set(32, 50, 'L');
-      // fondamenta di pietra
-      for (let y = 55; y <= 59; y++) for (let x = 2; x <= 57; x++) set(x, y, (x + ((y & 1) ? 3 : 0)) % 6 === 0 || y === 59 ? '2' : '3');
-      rect(23, 57, 36, 58, '4'); rect(24, 59, 35, 60, '3');                  // gradini
-      // extra del mestiere
-      if (kind === 'smith') { rect(10, 32, 17, 38, 'D'); for (let x = 10; x <= 17; x += 2) set(x, 37, 'P'); }   // fornace che brilla
-      if (kind === 'armor') { rect(26, 31, 33, 38, 'y'); rect(27, 32, 32, 36, 'z'); rect(29, 33, 30, 35, 'D'); } // stemma sullo scudo
-      if (kind === 'inn') { rect(24, 30, 35, 37, 'f'); rect(25, 31, 34, 36, 'h'); for (let x = 26; x <= 33; x += 2) set(x, 33, 'j'); } // insegna
-      if (kind === 'magister') { rect(24, 30, 35, 37, '9'); rect(25, 31, 34, 36, '8'); rect(29, 31, 30, 36, '5'); for (let x = 26; x <= 33; x += 2) if (x !== 30) set(x, 33, '6'); } // libro aperto
-      if (kind === 'haruspex') { rect(25, 30, 34, 37, 'B'); rect(26, 31, 33, 36, 'C'); rect(28, 32, 31, 35, 'D'); set(29, 33, 'P'); set(30, 34, 'P'); } // occhio rosso
-      if (kind === 'weapons') { for (let k = 0; k < 3; k++) { rect(25 + k * 4, 31, 25 + k * 4, 37, '7'); set(25 + k * 4, 30, '9'); set(24 + k * 4, 36, 'f'); set(26 + k * 4, 36, 'f'); } } // spade incrociate
-      this._register(name, g);
+        set(x0 - 1, y1 - 1, RIM); set(x1 + 1, y1 - 1, RIM);                  // punte all'insù
+      };
+      // frontone triangolare con la base sulla riga yb
+      o.gable = (x0, x1, yb, face, trim) => {
+        const h = (x1 - x0) >> 1;
+        for (let k = 0; k <= h; k++) for (let x = x0 + k; x <= x1 - k; x++) set(x, yb - k, x === x0 + k || x === x1 - k ? trim : face);
+      };
+      o.planks = (x0, y0, x1, y1, a, b) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, x % 3 === 0 ? a : b); };
+      o.plaster = (x0, y0, x1, y1) => { rect(x0, y0, x1, y1, '7'); rect(x0, y0, x1, y0, '5'); };
+      // finestra di carta accesa, con la grata
+      o.win = (x0, y0, x1, y1) => {
+        rect(x0, y0, x1, y1, 'f');
+        for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++)
+          set(x, y, (x - x0) % 3 === 0 || (y - y0) % 3 === 0 ? 'F' : (x + y) % 4 === 0 ? 'P' : 'G');
+      };
+      // lanterna di carta (3x4) appesa per il gancio in (x+1, y)
+      o.lamp = (x, y, paper) => {
+        set(x + 1, y, 'g'); rect(x, y + 1, x + 2, y + 2, paper || 'G'); set(x + 1, y + 1, 'P'); set(x + 1, y + 2, 'P'); set(x + 1, y + 3, 'F');
+        o.lamps.push([x + 1, y + 2]);
+      };
+      // stemma bianco (mon) 3x3 centrato in (x, y)
+      o.mon = (x, y, bg) => { set(x, y - 1, '9'); set(x - 1, y, '9'); set(x + 1, y, '9'); set(x, y + 1, '9'); set(x, y, bg); };
+      // tenda (noren) del colore del mestiere, divisa in teli, con lo stemma
+      o.noren = (x0, y0, x1, y1, col) => {
+        const [c0, c1, c2] = col;
+        rect(x0 - 1, y0, x1 + 1, y0, 'g');
+        for (let y = y0 + 1; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          if ((x - x0) % 4 === 3 && y > y0 + 2) continue;                    // spacchi tra i teli
+          set(x, y, y === y1 ? c0 : x === x0 ? c2 : c1);
+        }
+        o.mon((x0 + x1) >> 1, y0 + 3, c0);
+      };
+      // stendardo verticale con lo stemma e la coda a punte
+      o.banner = (x0, y0, x1, y1, col) => {
+        const [c0, c1, c2] = col;
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          if (y === y1 && (x - x0) % 2 === 1) continue;
+          set(x, y, y === y0 ? c0 : x === x0 ? c2 : x === x1 ? c0 : c1);
+        }
+        o.mon((x0 + x1) >> 1, y0 + 4, c0);
+      };
+      o.stone = (x0, y0, x1, y1) => {
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const row = ((y - y0) / 3) | 0;
+          set(x, y, (y - y0) % 3 === 2 || (x + (row & 1) * 3) % 6 === 0 ? '2' : (x * 5 + y * 3) % 11 === 0 ? '4' : '3');
+        }
+      };
+      o.line = (xa, ya, xb, yb, c) => {
+        const n = Math.max(Math.abs(xb - xa), Math.abs(yb - ya));
+        for (let i = 0; i <= n; i++) set(Math.round(xa + (xb - xa) * i / n), Math.round(ya + (yb - ya) * i / n), c);
+      };
+      o.done = (name, sign, smoke) => {
+        const e = this._register(name, o.g);
+        e.sign = [sign[0] + 1, sign[1] + 1, !!sign[2]];
+        e.smoke = smoke ? [smoke[0] + 1, smoke[1] + 1] : null;
+        e.lamps = o.lamps.map(([x, y]) => [x + 1, y + 1]);
+        return e;
+      };
+      return o;
     };
-    house('h_smith',   ['D', 'C', 'B'], '4', 'smith');
-    house('h_weapons', ['z', 'y', 'x'], '5', 'weapons');
-    house('h_armor',   ['e', 'd', 'c'], '5', 'armor');
-    house('h_inn',     ['p', 'o', 'n'], '5', 'inn');
-    house('h_magister', ['u', 't', 's'], '5', 'magister');
-    house('h_haruspex', ['G', 'F', 'E'], '4', 'haruspex');
+
+    // LOCANDA: due piani di legno, finestre lunghe accese, noren viola e lanterne rosse
+    {
+      const o = jp(52, 48), { set, rect } = o;
+      o.roof(5, 46, 1, 9, 12);
+      set(17, 0, '3'); set(34, 0, '3');
+      o.planks(9, 10, 42, 19, 'g', 'h'); rect(9, 10, 42, 10, '1'); rect(9, 10, 9, 19, 'f'); rect(42, 10, 42, 19, 'f');
+      o.win(12, 12, 39, 18);
+      o.roof(2, 49, 20, 24, 3);
+      o.planks(5, 25, 46, 42, 'g', 'h'); rect(5, 25, 46, 25, '1'); rect(5, 25, 5, 42, 'f'); rect(46, 25, 46, 42, 'f');
+      rect(20, 28, 31, 42, 'E'); rect(21, 33, 30, 42, 'F');
+      o.noren(20, 28, 31, 35, COL.inn);
+      o.win(8, 29, 16, 37); o.win(35, 29, 43, 37);
+      o.lamp(17, 25, 'D'); o.lamp(32, 25, 'D');
+      o.stone(3, 43, 48, 45); rect(21, 44, 30, 45, '4'); rect(22, 46, 29, 47, '3');
+      o.done('h_inn', [26, 15]);
+    }
+    // FORGIA: tetto basso con lo sfiato da cui esce il fumo, bocca del fuoco accesa, muro di pietra
+    {
+      const o = jp(50, 42), { set, rect } = o;
+      rect(22, 1, 27, 3, '3'); rect(21, 0, 28, 0, '2');                          // sfiato sul colmo
+      o.roof(3, 46, 3, 13, 15);
+      o.planks(5, 14, 44, 26, 'f', 'g'); rect(5, 14, 44, 14, '1');
+      o.stone(5, 27, 44, 35);
+      rect(7, 17, 20, 35, 'f'); rect(8, 18, 19, 35, 'A');                         // bocca della forgia
+      for (let y = 25; y <= 35; y++) for (let x = 8; x <= 19; x++) {
+        const k = y - 25 + ((x * 7) % 3);
+        set(x, y, k > 8 ? ((x + y) % 2 ? 'P' : 'G') : k > 5 ? ((x + y) % 3 ? 'G' : 'D') : k > 2 ? 'D' : 'C');
+      }
+      rect(9, 31, 18, 31, '6'); rect(10, 32, 17, 35, '5');                        // incudine davanti al fuoco
+      rect(23, 21, 30, 35, 'f'); o.planks(24, 22, 29, 35, 'g', 'h');
+      o.noren(23, 20, 30, 26, COL.smith);
+      o.win(34, 17, 41, 24);
+      o.lamp(31, 15);
+      o.stone(3, 36, 46, 39); rect(23, 40, 30, 41, '4');
+      o.done('h_smith', [38, 31], [24, 0]);
+    }
+    // ARMAIOLO: torre di guardia di legno, tetto di paglia, stendardo blu, barili ai piedi
+    {
+      const o = jp(34, 56), { set, rect } = o;
+      for (const [xa, xb] of [[7, 10], [11, 8], [26, 23], [22, 25]]) o.line(xa, 0, xb, 3, 'g');   // pali incrociati sul colmo
+      o.roof(2, 31, 3, 12, 9, ['h', 'i', 'j'], 'i');
+      for (let y = 4; y <= 10; y++) for (let x = 3; x <= 30; x++)                 // paglia a fasce, non coppi
+        if ('ij'.includes(o.g[y][x])) set(x, y, (x * 3 + y * 7) % 5 === 0 ? 'h' : y % 3 === 1 ? 'i' : 'j');
+      for (let x = 2; x <= 31; x += 3) set(x, 13, 'h');                           // frangia di paglia
+      rect(7, 14, 26, 20, '1');
+      o.lamp(15, 14);
+      rect(5, 13, 6, 21, 'f'); rect(27, 13, 28, 21, 'f');
+      rect(5, 17, 28, 17, 'h'); for (let x = 8; x <= 25; x += 3) rect(x, 18, x, 20, 'g');
+      rect(3, 21, 30, 22, 'g'); rect(3, 21, 30, 21, 'h');
+      rect(12, 23, 13, 52, 'g'); rect(20, 23, 21, 52, 'g');                       // gambe dietro
+      for (let y = 23; y <= 52; y++) {                                            // gambe davanti (divaricate)
+        const d = Math.round((y - 23) * 3 / 29);
+        set(6 - d, y, 'h'); set(7 - d, y, 'f'); set(27 + d, y, 'f'); set(26 + d, y, 'h');
+      }
+      o.line(7, 24, 26, 37, 'h'); o.line(26, 24, 7, 37, 'h'); rect(6, 37, 27, 37, 'g');
+      o.line(6, 38, 27, 51, 'h'); o.line(27, 38, 6, 51, 'h');
+      o.banner(18, 23, 24, 35, COL.weapons);
+      for (const bx of [1, 7]) {                                                  // barili
+        rect(bx, 47, bx + 5, 53, 'h'); rect(bx + 1, 47, bx + 4, 53, 'i');
+        rect(bx, 48, bx + 5, 48, '4'); rect(bx, 52, bx + 5, 52, '4'); rect(bx + 1, 46, bx + 4, 46, 'g');
+      }
+      rect(2, 54, 31, 55, '3'); rect(2, 55, 31, 55, '2');
+      o.done('h_weapons', [17, 43]);
+    }
+    // CORAZZAIO: piccolo castello a tre tetti, mura chiare, basamento di pietra e stendardi verdi
+    {
+      const o = jp(48, 58), { set, rect } = o;
+      o.roof(14, 33, 2, 8, 5);
+      set(19, 1, 'L'); set(18, 0, 'K'); set(28, 1, 'L'); set(29, 0, 'K');        // pesci d'oro sul colmo
+      o.plaster(16, 9, 31, 14); rect(19, 11, 21, 13, 'f'); set(20, 12, 'G'); rect(26, 11, 28, 13, 'f'); set(27, 12, 'G');
+      o.roof(8, 39, 15, 20, 6);
+      o.gable(19, 28, 18, '6', '3'); set(23, 14, 'L'); set(24, 14, 'L');
+      o.plaster(11, 21, 36, 28);
+      for (const wx of [14, 22, 30]) { rect(wx, 23, wx + 3, 26, 'f'); rect(wx + 1, 24, wx + 2, 25, 'G'); }
+      o.roof(3, 44, 29, 34, 6);
+      o.plaster(7, 35, 40, 39);
+      for (let y = 40; y <= 44; y++) for (let x = 7; x <= 40; x++) set(x, y, x % 2 ? '1' : '2');   // assi scure in basso
+      rect(10, 36, 13, 38, 'f'); rect(11, 37, 12, 37, 'G'); rect(34, 36, 37, 38, 'f'); rect(35, 37, 36, 37, 'G');
+      rect(20, 37, 27, 44, 'f'); o.planks(21, 38, 26, 44, 'g', 'h'); set(22, 41, 'K'); set(25, 41, 'K');
+      o.lamp(16, 35); o.lamp(29, 35);
+      for (let y = 45; y <= 55; y++) {                                            // basamento a scarpa
+        const a = Math.round((55 - y) * 4 / 10), row = ((y - 45) / 3) | 0;
+        for (let x = 1 + a; x <= 46 - a; x++) set(x, y, (y - 45) % 3 === 2 || (x + (row & 1) * 4) % 8 === 0 ? '2' : x < 12 ? '4' : '3');
+      }
+      for (let y = 45; y <= 57; y++) { const a = Math.max(0, 57 - y) >> 2; rect(19 - (3 - a), y, 28 + (3 - a), y, y % 2 ? '5' : '4'); }   // scalinata
+      for (const [px, fx] of [[0, 1], [47, 43]]) {                                // stendardi
+        rect(px, 30, px, 55, 'g'); set(px, 29, 'K');
+        o.banner(fx, 31, fx + 3, 41, COL.armor);
+      }
+      o.done('h_armor', [38, 50]);
+    }
+    // MAGISTER: pagoda a tre tetti di rame verde, pilastri rossi, guglia d'oro
+    {
+      const o = jp(34, 58), { set, rect } = o;
+      const TEAL = ['r', 's', 't'];
+      rect(16, 1, 17, 10, 'K'); for (const y of [3, 5, 7]) rect(15, y, 18, y, 'L'); rect(16, 0, 17, 0, 'L');
+      o.roof(8, 25, 10, 15, 5, TEAL, 'u');
+      rect(11, 16, 22, 20, 'h'); rect(11, 16, 11, 20, 'C'); rect(22, 16, 22, 20, 'C'); o.win(14, 16, 19, 20); rect(11, 16, 22, 16, '1');
+      o.roof(5, 28, 21, 26, 5, TEAL, 'u');
+      rect(9, 27, 24, 31, 'h'); rect(9, 27, 9, 31, 'C'); rect(24, 27, 24, 31, 'C'); o.win(12, 27, 21, 31); rect(9, 27, 24, 27, '1');
+      o.roof(1, 32, 32, 38, 6, TEAL, 'u');
+      o.planks(5, 39, 28, 50, 'g', 'h'); rect(5, 39, 28, 40, '1');
+      rect(5, 39, 6, 50, 'C'); set(5, 41, 'D'); rect(5, 42, 5, 50, 'D'); rect(27, 39, 28, 50, 'C');
+      o.win(11, 42, 22, 50);
+      o.lamp(7, 39, 'D'); o.lamp(24, 39, 'D');
+      o.stone(3, 51, 30, 54); rect(12, 55, 21, 55, '4'); rect(13, 56, 20, 57, '3');
+      o.done('h_magister', [-6, 46, true]);
+    }
+    // ARUSPICE: santuario con pilastri rossi, corda sacra, frontone curvo d'oro e due lanterne di pietra
+    {
+      const o = jp(56, 46), { set, rect } = o;
+      o.roof(5, 50, 2, 15, 16);
+      set(21, 1, 'L'); set(20, 0, 'K'); set(34, 1, 'L'); set(35, 0, 'K'); rect(27, 1, 28, 1, 'L');
+      for (let x = 19; x <= 36; x++) {                                            // frontone curvo
+        const top = 14 - Math.round(4 * Math.sin(Math.PI * (x - 19) / 17));
+        for (let y = top; y <= 14; y++) set(x, y, y === top ? 'L' : y === top + 1 ? 'K' : y % 2 ? 'C' : 'B');
+      }
+      rect(9, 16, 46, 36, '1');
+      rect(7, 16, 48, 17, 'C'); for (let x = 9; x <= 46; x += 6) set(x, 16, 'L');
+      o.planks(11, 18, 17, 36, 'f', 'g'); o.planks(38, 18, 44, 36, 'f', 'g');
+      o.win(21, 24, 34, 36);
+      for (const px of [9, 18, 36, 45]) { rect(px, 18, px + 1, 36, 'D'); rect(px + 1, 18, px + 1, 36, 'C'); }
+      o.lamp(13, 20, 'D'); o.lamp(40, 20, 'D');
+      for (let x = 15; x <= 40; x++) {                                            // corda sacra con le strisce di carta
+        const sag = x > 21 && x < 34 ? 1 : 0;
+        set(x, 19 + sag, (x + sag) % 2 ? 'j' : 'K'); set(x, 20 + sag, (x + sag) % 2 ? 'K' : 'i');
+      }
+      for (const zx of [20, 27, 34]) { set(zx, 22, '9'); set(zx + 1, 23, '9'); set(zx, 24, '9'); set(zx + 1, 25, '8'); }
+      rect(6, 37, 49, 38, 'g'); rect(6, 37, 49, 37, 'h');
+      o.stone(5, 39, 50, 41);
+      rect(22, 39, 33, 40, '5'); rect(21, 41, 34, 42, '4'); rect(20, 43, 35, 44, '3'); rect(20, 45, 35, 45, '2');
+      for (const lx of [0, 51]) {                                                 // lanterne di pietra
+        rect(lx + 1, 27, lx + 3, 27, '5'); rect(lx, 28, lx + 4, 28, '5');
+        rect(lx + 1, 29, lx + 3, 31, '4'); set(lx + 2, 29, 'G'); set(lx + 2, 30, 'P');
+        rect(lx, 32, lx + 4, 32, '4'); rect(lx + 2, 33, lx + 2, 41, '4'); rect(lx + 1, 33, lx + 1, 41, '5');
+        rect(lx, 42, lx + 4, 44, '3'); rect(lx, 42, lx + 4, 42, '4');
+        o.lamps.push([lx + 2, 30]);
+      }
+      o.done('h_haruspex', [27, 21]);
+    }
     // arredi
     this.fromRows('v_anvil', ['.777777777..', '78888888887.', '.777777777..', '...6666....', '...6666....', '..666666...', '.33333333..']);
     this.fromRows('v_rack', ['g.........g', 'g.9..9..9.g', 'gg7gg7gg7gg', 'g.7..7..7.g', 'g.7..7..7.g', 'g.7..7..7.g', 'g.f..f..f.g', 'g.f..f..f.g', 'g.........g', 'gg.......gg']);
@@ -545,12 +685,64 @@ const SPR = {
         f.fillStyle = rnd() < 0.5 ? '#16141d' : '#13111a'; f.fillRect(x + 1, y + 1, 6, 6);
         f.fillStyle = '#1c1925'; f.fillRect(x + 1, y + 1, 6, 1);
       }
+    } else if (kind === 'grass') {
+      // ERBA VERDE SCURO (la Cripta, 2026-10-17): chiazze più scure, fili d'erba a due toni, punte chiare, sassolini
+      const pw = (col, x, y, w, h) => px(col, ((x % T) + T) % T, ((y % T) + T) % T, w, h);   // si ripete senza giunte
+      f.fillStyle = '#1a2b15'; f.fillRect(0, 0, T, T);
+      for (let i = 0; i < 26; i++) {
+        const cx = rnd() * T, cy = rnd() * T, r = 4 + rnd() * 9;
+        for (let k = 0; k < r * 4; k++) pw('#15240f', cx + (rnd() - 0.5) * r * 2, cy + (rnd() - 0.5) * r, 2, 1);
+      }
+      for (let i = 0; i < 520; i++) pw(rnd() < 0.5 ? '#203519' : '#243b1c', rnd() * T, rnd() * T, 1, 2);
+      for (let i = 0; i < 140; i++) pw('#2c4722', rnd() * T, rnd() * T, 1, 1);
+      for (let i = 0; i < 18; i++) pw(rnd() < 0.5 ? '#2a2618' : '#24221a', rnd() * T, rnd() * T, 2, 1);
+      for (let i = 0; i < 8; i++) pw(rnd() < 0.5 ? '#3d3350' : '#4d4526', rnd() * T, rnd() * T, 1, 1);
     } else if (kind === 'village') {
       f.fillStyle = '#0a0c08'; f.fillRect(0, 0, T, T);
       for (let i = 0; i < 420; i++) px(rnd() < 0.5 ? '#121a0e' : '#0e140b', rnd() * T, rnd() * T, 1, 1 + (rnd() * 2 | 0)); // erba scura
       for (let i = 0; i < 30; i++) px('#1d2a14', rnd() * T, rnd() * T);
       for (let i = 0; i < 10; i++) px(rnd() < 0.5 ? '#2a1530' : '#2e2612', rnd() * T, rnd() * T);                   // fiorellini
     }
+    return c;
+  },
+
+  // CONTORNO NEON (armi evolute): i pixel neri del bordo esterno diventano verde evidenziatore, l'interno resta scuro
+  _neonize(src) {
+    const W = src.width, H = src.height, c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.drawImage(src, 0, 0);
+    const img = g.getImageData(0, 0, W, H), d = img.data, mark = new Uint8Array(W * H);
+    const clear = (x, y) => x < 0 || y < 0 || x >= W || y >= H || d[(y * W + x) * 4 + 3] === 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (d[i + 3] === 0 || d[i] || d[i + 1] || d[i + 2]) continue;     // solo i pixel neri
+      if (clear(x - 1, y) || clear(x + 1, y) || clear(x, y - 1) || clear(x, y + 1)) mark[y * W + x] = 1;
+    }
+    const nr = parseInt(EVO_NEON.slice(1, 3), 16), ng = parseInt(EVO_NEON.slice(3, 5), 16), nb = parseInt(EVO_NEON.slice(5, 7), 16);
+    for (let k = 0; k < W * H; k++) if (mark[k]) { d[k * 4] = nr; d[k * 4 + 1] = ng; d[k * 4 + 2] = nb; }
+    g.putImageData(img, 0, 0);
+    return c;
+  },
+  // versione neon di uno sprite (e delle sue 16 rotazioni): e.neon, e.neonRot. Si prepara una volta sola.
+  neon(name) {
+    const e = this.cache[name];
+    if (!e || e.neon) return e;
+    e.neon = this._neonize(e.img);
+    if (e.rot) e.neonRot = e.rot.map((r) => this._neonize(r));
+    return e;
+  },
+  // icona neon per la UI (HUD, carte, resoconto)
+  neonUrl(name) {
+    const e = this.neon(name);
+    return e ? (e.neonUrl || (e.neonUrl = e.neon.toDataURL())) : '';
+  },
+
+  // schiarisce un pavimento già disegnato (il giorno è un po' più luminoso): ogni canale x mul + add
+  lighten(c, mul, add) {
+    const g = c.getContext('2d'), img = g.getImageData(0, 0, c.width, c.height), d = img.data;
+    for (let i = 0; i < d.length; i += 4) for (let j = 0; j < 3; j++) d[i + j] = Math.min(255, d[i + j] * mul + add);
+    g.putImageData(img, 0, 0);
     return c;
   },
 
@@ -808,6 +1000,23 @@ const SPR = {
       '......9..',
     ], { rotate: true });
     this.fromFn('orb', 7, 7, this.circleFn(7, 't', '9', 's'));
+    // STELLE DI COCITO: stella di ghiaccio a 4 punte in ALTA RISOLUZIONE (e.hi: 2 pixel del gioco = 1 pixel qui),
+    // due fotogrammi che si alternano (punte dritte / punte in diagonale) = scintilla
+    const ICE = { w: '#f2efff', a: '#a3d2e0', b: '#4f8aa0', c: '#2a4d5e' };
+    for (const k in ICE) if (!PAL['ice_' + k]) PAL['ice_' + k] = ICE[k];
+    const star = (rot, R, R2) => (x, y) => {
+      const dx0 = x - 11, dy0 = y - 11, d = Math.sqrt(dx0 * dx0 + dy0 * dy0);
+      // stella grande a 4 punte + stellina piccola ruotata di 45° dietro (8 punte in tutto)
+      const pt = (dx, dy, RR) => Math.sqrt(Math.abs(dx)) + Math.sqrt(Math.abs(dy)) <= Math.sqrt(RR);
+      let dx = dx0, dy = dy0;
+      if (rot) { dx = (dx0 + dy0) * 0.7071; dy = (dx0 - dy0) * 0.7071; }
+      const big = pt(dx, dy, R), small = pt((dx + dy) * 0.7071, (dx - dy) * 0.7071, R2);
+      if (!big && !small) return d < 4.6 ? 'ice_b' : null;            // alone tondo attorno al cuore
+      if (d < 3.2) return 'ice_w';
+      if (big) return Math.abs(dx) < 0.8 || Math.abs(dy) < 0.8 ? 'ice_w' : 'ice_a';   // nervatura bianca, punte azzurro chiaro
+      return d < 5 ? 'ice_a' : 'ice_b';
+    };
+    for (const [n, rot] of [['star_ice', false], ['star_ice2', true]]) { const e = this.fromFn(n, 23, 23, star(rot, 11, 5)); e.hi = true; }
     this.fromFn('bomb', 9, 11, (x, y) => {
       if (y === 0 && x === 6) return 'P';
       if (y === 1 && (x === 5 || x === 7)) return 'G';
@@ -869,6 +1078,8 @@ const SPR = {
     this.fromRows('ico_helix', ['..LLLLL..', '.L.....L.', 'L..KKK..L', 'L.K...K.L', 'L.K.w.K.L', 'L.K..KK.L', 'L..K....L', '.L..KKKL.', '..L......']);
     this.fromRows('ico_area', ['7.......7', '.7.....7.', '..8...8..', '...999...', '...9w9...', '...999...', '..8...8..', '.7.....7.', '7.......7']);
     this.fromRows('ico_twins', ['.w....w.', 'w9w..w9w', '.w....w.', '.7....7.', '.777777.', '.7....7.', '.7....7.']);
+    // Arcanum [?] del Magister: scrigno viola col punto di domanda (fusione delle armi)
+    this.fromRows('ico_arcanum', ['.ppppppp.', 'pnnnnnnnp', 'pnnZZZnnp', 'pnZnnnZnp', 'pnnnnnZnp', 'pnnnZZnnp', 'pnnnZnnnp', 'pnnnnnnnp', 'pnnnZnnnp', '.ppppppp.']);
     this.fromRows('ico_greed', ['..hhh..', '...h...', '.ggggg.', 'gggLggg', 'ggLLLgg', 'gggLggg', '.ggggg.']);
     this.fromRows('ico_armor', ['.6.....6.', '6666.6666', '677777776', '.6777776.', '.6787876.', '.6777776.', '..67776..', '...666...']);
     // lama del Pugio per il fendente (16 rotazioni)
@@ -879,40 +1090,15 @@ const SPR = {
     Doll.init();   // personaggi ad alta risoluzione (Eek, abitanti del villaggio)
     BossArt.init(); // boss del minuto 7 e 10 di ogni mappa
 
-    // PAVIMENTO DELLA CRIPTA (tile 128x128) ----------------------------------
-    const T = 128;
-    this.floor = document.createElement('canvas');
-    this.floor.width = this.floor.height = T;
-    const f = this.floor.getContext('2d');
-    let seed = 1337;
-    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    f.fillStyle = '#060509'; f.fillRect(0, 0, T, T);
-    for (let ty = 0; ty < T; ty += 32) {
-      const off = (ty / 32) % 2 ? 16 : 0;
-      for (let tx = -32; tx < T; tx += 32) {
-        f.fillStyle = rnd() < 0.5 ? '#0b0a0f' : '#0d0c12';
-        f.fillRect(tx + off + 1, ty + 1, 30, 30);
-        // luce sul bordo alto-sinistro della lastra
-        f.fillStyle = '#16141d';
-        f.fillRect(tx + off + 1, ty + 1, 30, 1); f.fillRect(tx + off + 1, ty + 1, 1, 30);
-      }
-    }
-    for (let i = 0; i < 90; i++) {
-      const r = rnd();
-      f.fillStyle = r < 0.06 ? '#2a0e14' : r < 0.12 ? '#14240f' : r < 0.5 ? '#18161f' : '#030205';
-      f.fillRect((rnd() * T) | 0, (rnd() * T) | 0, 1, 1);
-    }
-    // muschio
-    for (let i = 0; i < 4; i++) {
-      const cx = rnd() * T, cy = rnd() * T;
-      for (let k = 0; k < 14; k++) {
-        f.fillStyle = rnd() < 0.3 ? '#1b2e14' : '#122010';
-        f.fillRect((cx + (rnd() - 0.5) * 10) | 0, (cy + (rnd() - 0.5) * 6) | 0, 1, 1);
-      }
-    }
+    // PAVIMENTO DELLA CRIPTA: erba verde scuro (prima erano lastre quasi nere: di notte non si notava la differenza)
+    this.floor = this.makeFloor('grass');
     // pattern per i dither (trasparenze "finte")
     this.dither = this.makeDither(PAL.o);
     this.floors = { cripta: this.floor, village: this.makeFloor('village') };
     for (const k of ['palude', 'cattedrale', 'selva', 'dite', 'cocito', 'slab', 'plaza']) this.floors[k] = this.makeFloor(k);
+    // versioni col contorno neon degli sprite che le armi evolute lanciano
+    for (const n of ['proj_salt', 'proj_kunai', 'orb', 'proj_scythe', 'bomb', 'flask']) this.neon(n);   // Linguae Ignis evoluta usa wisp_evo
+    // giorno un po' più chiaro sulle altre mappe (il villaggio resta com'è)
+    for (const k of ['palude', 'cattedrale', 'selva', 'dite', 'cocito', 'slab']) this.lighten(this.floors[k], DAY_LIFT.mul, DAY_LIFT.add);
   },
 };

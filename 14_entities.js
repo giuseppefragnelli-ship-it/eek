@@ -75,6 +75,7 @@ const Projectiles = new Pool(CFG.MAX_PROJ, [
   'src',                 // indice dell'arma che l'ha sparato (per il resoconto danni)
   'tgt',                 // fuochi fatui: nemico inseguito | falce: già tornata indietro
   'h0', 'h1', 'h2', 'h3', 'hn', // ultimi uid colpiti (un proiettile perforante non colpisce due volte lo stesso)
+  'evo',                 // 1 = sparato da un'arma evoluta (contorno neon)
 ]);
 
 const Gems = new Pool(CFG.MAX_GEMS, [
@@ -84,8 +85,9 @@ const Gems = new Pool(CFG.MAX_GEMS, [
 // Effetti visivi (fulmini, esplosioni) — solo grafica, nessuna logica
 const FX = new Pool(CFG.MAX_FX, [
   'alive', 'kind', 'x', 'y', 'x2', 'y2', 'life', 'life0', 'r', 'seed', 'val',
+  'evo',      // 1 = effetto di un'arma evoluta (fulmini, esplosioni, sferzate, onde: contorno neon)
 ]);
-const FXK = { BOLT: 0, BOOM: 1, SPLAT: 2, NUM: 3, SLASH: 4, PUFF: 5, RING: 6, THRUST: 7, SPARK: 8, WHIP: 9, NOVA: 10 };
+const FXK = { BOLT: 0, BOOM: 1, SPLAT: 2, NUM: 3, SLASH: 4, PUFF: 5, RING: 6, THRUST: 7, SPARK: 8, WHIP: 9, NOVA: 10, FLARE: 11, GLINT: 12 };   // GLINT = impatto dorato degli Strali di Giove   // FLARE = scoppio di Linguae Ignis
 
 // Proiettili dei nemici (palle di melma degli Sputacchini, raffiche del boss finale) + pozze di veleno (kind 2)
 const EShots = new Pool(CFG.MAX_ESHOTS, ['alive', 'kind', 'x', 'y', 'px', 'py', 'vx', 'vy', 'life', 'dmg', 'r']);
@@ -110,10 +112,12 @@ const G = {
   diff: DIFFICULTY[DEFAULT_DIFFICULTY],
   diffId: DEFAULT_DIFFICULTY,
   pendingLevels: 0,
+  rerolls: 0,        // rilanci delle carte rimasti in questa partita
   slowFactor: 1,
   shake: 0,
   flash: 0,          // lampo bianco a tutto schermo (fulmini del boss 2)
   night: false,
+  nightK: 0,         // quanto è buio (0 giorno .. 1 notte piena): sale e scende piano (crepuscolo/alba)
   mergeT: 0,
   map: MAPS.cripta, mapId: 'cripta',
   src: null,         // arma che sta infliggendo danno in questo momento (resoconto danni)
@@ -123,6 +127,7 @@ const G = {
   lvlT: 0,                      // breve attesa prima delle carte del level up (onda d'urto)
   chestQueue: [], chestSeen: false, dyingT: 0,  // forzieri raccolti da aprire, primo forziere della partita già visto
   rs: { elites: 0, chests: 0, evos: 0, bosses: {} },  // statistiche della partita (sommate alla carriera a fine partita)
+  unlockT: Infinity,            // prossimo sblocco segreto possibile su questa mappa (secondi; vedi checkUnlocks)
   nextUid: 1,
   viewW: 1280, viewH: CFG.VIEW_H,
   camX: 0, camY: 0,
@@ -244,6 +249,7 @@ function spawnProjectile(kind, x, y, dx, dy, speed, dmg, r, size, life, pierce, 
   P.dmg[i] = dmg; P.r[i] = r; P.size[i] = size;
   P.life[i] = P.life0[i] = life; P.pierce[i] = pierce; P.kb[i] = kb;
   P.src[i] = G.src ? G.src.slot : -1;
+  P.evo[i] = G.src && G.src.evolved ? 1 : 0;
   return i;
 }
 
@@ -252,7 +258,8 @@ function spawnFx(kind, x, y, life, r, x2, y2) {
   if (i < 0) return -1;
   FX.alive[i] = 1; FX.kind[i] = kind; FX.x[i] = x; FX.y[i] = y;
   FX.x2[i] = x2 === undefined ? x : x2; FX.y2[i] = y2 === undefined ? y : y2;
-  FX.life[i] = FX.life0[i] = life; FX.r[i] = r; FX.seed[i] = (Math.random() * 1000) | 0;
+  FX.life[i] = FX.life0[i] = life; FX.r[i] = r; FX.seed[i] = (Math.random() * 1000) | 0; FX.val[i] = 0;
+  FX.evo[i] = G.src && G.src.evolved ? 1 : 0;
   return i;
 }
 

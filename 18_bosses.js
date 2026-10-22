@@ -8,18 +8,21 @@
 //  Flegiàs (5:00): cammina, preavviso rosso + carica, evoca gocce.
 //  Guardiano minore della mappa (b2): fulmini su zone segnate e/o evoca servi.
 //  Guardiano maggiore della mappa (b3): raggiere e spirali di proiettili.
-// La partita si VINCE resistendo fino a WIN.time (7:00); al minuto 10 (solo se continui) arrivano tutti e tre.
+// La partita si VINCE resistendo fino a WIN.time (7:00). Se continui: subito i due guardiani della mappa (DUO),
+// al minuto 10 tutti e tre (TRIO).
 // ---------------------------------------------------------------------------
 const Boss = {
   MAX: 4,
   n: 0, list: new Int32Array(4), slots: [],
   active: false, idx: -1, kind: -1,
   spawned1: false, warned1: false, spawnedTrio: false, warnedTrio: false, warnedWin: false,
+  duoT: 0, spawnedDuo: false, warnedDuo: false,   // duoT = secondo di arrivo dei due guardiani (lo fissa continueEndless)
   endlessT: 0, endlessN: 0,
   hp: 0, maxHp: 1,
   reset() {
     this.n = 0; this.sync();
     this.spawned1 = this.warned1 = this.spawnedTrio = this.warnedTrio = this.warnedWin = false;
+    this.duoT = 0; this.spawnedDuo = this.warnedDuo = false;
     this.endlessT = 0; this.endlessN = 0;
     Strikes.n = 0;
   },
@@ -82,11 +85,19 @@ function spawnBoss(type, quiet) {
   UI.showBoss(true);
 }
 
-// i tre boss della mappa insieme (minuto 10, solo in modalità infinita)
+// i due guardiani della mappa insieme (subito dopo la vittoria, se continui)
+function spawnBossDuo() {
+  Boss.spawnedDuo = true;
+  spawnBoss(ET.boss2, true); spawnBoss(ET.boss3, true);
+  UI.toast('Errore critico', bossName(ET.boss2) + ' e ' + bossName(ET.boss3) + ' sono arrivati insieme.', 5);
+}
+
+// i tre boss della mappa insieme (minuto 10, solo in modalità infinita).
+// Chi è ancora vivo (es. un guardiano arrivato dopo la vittoria) non viene raddoppiato.
 function spawnBossTrio() {
   Boss.spawnedTrio = true;
-  spawnBoss(ET.boss, true); spawnBoss(ET.boss2, true); spawnBoss(ET.boss3, true);
-  UI.toast('Errore critico', bossNames() + ' sono arrivati insieme.', 5);
+  for (const type of [ET.boss, ET.boss2, ET.boss3]) if (!Boss.has(type)) spawnBoss(type, true);
+  UI.toast('Errore critico', bossNames() + (Boss.n > 1 ? ' sono arrivati insieme.' : ' è arrivato.'), 5);
 }
 
 function onBossKilled(i) {

@@ -25,6 +25,7 @@ const MapGen = {
 
   reset(mapId) {
     this.cache.clear();
+    this.mapId = mapId;
     this.mapIdx = Object.keys(MAPS).indexOf(mapId);
   },
 
@@ -61,6 +62,9 @@ const MapGen = {
         c.obs.push({ x, y, r: m.obsR, spr: m.obstacle });
       }
     }
+    // accampamento del Magister: lo spiazzo attorno resta sgombro
+    const MC = MAGISTER_CAMP;
+    if (this.mapId === MC.map) c.obs = c.obs.filter((o) => (o.x - MC.x) * (o.x - MC.x) + (o.y - MC.y) * (o.y - MC.y) > MC.clearR * MC.clearR);
     this.cache.set(key, c);
     return c;
   },

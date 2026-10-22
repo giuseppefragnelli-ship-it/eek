@@ -26,7 +26,7 @@ const MAPS = {
                 desc: '"Vexilla regis prodeunt inferni."' },
 };
 // BOSS DELLE MAPPE — guardiano minore (b2: fulmini su zone segnate) e maggiore (b3: raffiche di proiettili).
-// Arrivano INSIEME a Flegiàs al minuto 10, solo se dopo la vittoria continui (modalità infinita).
+// Solo se dopo la vittoria continui (modalità infinita): arrivano in coppia subito (DUO), poi con Flegiàs al minuto 10 (TRIO).
 // Stesse regole per tutte le mappe, ma ogni mappa ha i suoi due mostri danteschi.
 //   art     = funzione di BossArt che disegna lo sprite (sprite = 'boss_' + art)
 //   warn    = avviso qualche secondo prima
@@ -63,6 +63,24 @@ const MAP_BOSSES = {
 for (const id in MAP_BOSSES) for (const b of ['b2', 'b3']) { const c = MAP_BOSSES[id][b]; c.sprite = 'boss_' + c.art; MAPS[id][b] = c; }
 
 const MAP_CHUNK = 480;    // lato di un blocco di mappa (unità) per decorazioni e ostacoli
+
+// ----------------------------------------------------------------------------
+// SBLOCCHI SEGRETI — resisti fino a `time` (secondi) su `map`: in pratica in modalità infinita, dopo la vittoria.
+// Restano sbloccati per sempre (Save.data.unlocks). L'arma segreta ha `secret: <id>` in WEAPON_DEFS.
+// ----------------------------------------------------------------------------
+const UNLOCKS = {
+  wisps:    { map: 'cripta', time: 660, name: 'Linguae Ignis', kind: 'Arma segreta', hint: "resisti fino all'11:00 nella Cripta",
+              desc: 'Ora può uscire nelle carte del level up.' },
+  teleport: { map: 'palude', time: 660, name: 'Teletrasporto', kind: 'Abilità', hint: "resisti fino all'11:00 nella Palude",
+              desc: 'Tasto E (sul telefono il tasto TELE): ti sposta di colpo di qualche passo dove vai.' },
+  facile:   { map: 'cattedrale', time: 660, name: 'Modalità Facile', kind: 'Modalità', hint: "resisti fino all'11:00 nella Cattedrale",
+              desc: 'Solo nel Cocito: la scegli dalla scheda della mappa. Facile per modo di dire: dannati 10 volte più forti.' },
+};
+
+// IL MAGISTER — ha lasciato il Villaggio: studia tra le rovine della Cattedrale, a destra della partenza
+// (circa un minuto di cammino). Parlandoci in partita si apre la sua Schola (studi delle passive + Arcanum [?]).
+//   clearR = niente ostacoli attorno | talkR = distanza per parlarci | hintR = da qui freccia sul bordo e avviso
+const MAGISTER_CAMP = { map: 'cattedrale', x: 9000, y: 0, clearR: 230, talkR: 62, hintR: 3400 };
 
 // ----------------------------------------------------------------------------
 // VILLAGGIO — scena tra una partita e l'altra

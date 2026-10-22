@@ -17,21 +17,23 @@ function setState(s) {
 
 function startRun() {
   abandonRun();   // "Ricomincia" dalla pausa: la partita lasciata conta comunque
-  G.diffId = Save.data.difficulty;
-  G.diff = DIFFICULTY[G.diffId];
   G.mapId = Save.mapUnlocked(Save.data.map) ? Save.data.map : 'cripta';
   G.map = MAPS[G.mapId];
+  G.diffId = Save.diffFor(G.mapId);          // Facile solo sul Cocito (e solo se sbloccata)
+  G.diff = DIFFICULTY[G.diffId];
   MapGen.reset(G.mapId);
   Enemies.clear(); Projectiles.clear(); Gems.clear(); FX.clear(); EShots.clear(); Zones.clear();
   Obs.n = 0;
   G.time = 0; G.kills = 0; G.nextUid = 1; G.runCoins = 0; G.runBonus = 0;
-  G.pendingLevels = 0; G.slowFactor = 1; G.shake = 0; G.mergeT = 1; G.flash = 0; G.night = false;
+  G.pendingLevels = 0; G.rerolls = REROLL.perRun; G.slowFactor = 1; G.shake = 0; G.mergeT = 1; G.flash = 0; G.night = false; G.nightK = 0;
   G.victory = false; G.victoryT = 0; G.src = null;
   G.won = false; G.endless = false; G.hitStop = 0; G.lvlT = 0; G.dyingT = 0;
   G.chestQueue.length = 0; G.chestSeen = false;
   G.rs = { elites: 0, chests: 0, evos: 0, bosses: {} };
   G.paidMin = 0; G.killsC = 0; G.committed = false;
   G.scene = 'run';
+  nextUnlockTime();
+  Camp.reset();
   Player.reset();
   Spawner.reset();
   UI.showBoss(false);
@@ -119,11 +121,13 @@ function commitRun() {
 function step(dt) {
   collectObstacles();
   Player.update(dt);
+  Camp.update();                 // il Magister nella Cattedrale: sei vicino?
   Enemies.savePrev();
   Projectiles.savePrev();
   EShots.savePrev();
 
   G.time += dt;
+  if (G.time >= G.unlockT) checkUnlocks();
   Spawner.update(dt);
   Grid.build(Enemies, Player.x, Player.y);
   updateEnemies(dt);
@@ -166,6 +170,26 @@ function step(dt) {
     if (G.lvlT > 0) G.lvlT -= dt;          // l'onda d'urto si gode per un attimo
     else { setState('levelup'); UI.openLevelUp(); }
   }
+}
+
+// SBLOCCHI SEGRETI (UNLOCKS): G.unlockT = il prossimo tempo utile su questa mappa (Infinity se non c'è niente da sbloccare),
+// così lo step fa un solo confronto.
+function nextUnlockTime() {
+  G.unlockT = Infinity;
+  for (const id in UNLOCKS) { const u = UNLOCKS[id]; if (u.map === G.mapId && !Save.unlocked(id) && u.time < G.unlockT) G.unlockT = u.time; }
+}
+function checkUnlocks() {
+  for (const id in UNLOCKS) {
+    const u = UNLOCKS[id];
+    if (u.map !== G.mapId || Save.unlocked(id) || G.time < u.time) continue;
+    Save.data.unlocks[id] = true;
+    Save.write();
+    if (id === 'teleport') { Player.tele = true; Player.teleCd = 0; document.body.classList.add('has-tele'); }
+    spawnFx(FXK.RING, Player.x, Player.y, 0.6, 160);
+    Sfx.play('quest');
+    UI.toast('Sbloccato: ' + u.name, u.kind + '. ' + u.desc, 7, true);
+  }
+  nextUnlockTime();
 }
 
 // dopo il forziere: altri forzieri, poi le carte, poi si riprende
@@ -218,6 +242,7 @@ function onVictory() {
 function continueEndless() {
   if (G.state !== 'dead' || !G.won || G.endless) return;
   G.endless = true; G.victory = false;
+  if (!Boss.spawnedDuo) Boss.duoT = G.time + DUO.delay;   // i due guardiani della mappa arrivano tra poco
   UI.showBoss(Boss.active);
   EShots.clear();
   Player.invT = 2;
@@ -256,6 +281,9 @@ function handleKeys() {
   if (Input.consume('KeyO')) { G.debug = !G.debug; UI.setDebug(G.debug); }
   if (s === 'play') {
     if (Input.consume('Space') || Input.consume('ShiftLeft') || Input.consume('ShiftRight') || Input.dashReq) { Input.dashReq = false; Player.tryDash(); }
+    // vicino al Magister E/Invio parlano con lui; altrimenti E/Q = teletrasporto
+    if (Camp.near && (Input.consume('KeyE') || Input.consume('Enter'))) Camp.talk();
+    else if (Input.consume('KeyE') || Input.consume('KeyQ') || Input.teleReq) { Input.teleReq = false; Player.tryTeleport(); }
     if (Input.consume('KeyI')) G.god = !G.god;
     if (Input.consume('KeyP')) debugSpawn(300);
     if (Input.consume('KeyB')) debugBoss();
@@ -264,7 +292,7 @@ function handleKeys() {
   if (s === 'menu' && Input.consume('Enter')) UI.action('play');
   if (s === 'menu' && (Input.consume('ArrowLeft') || Input.consume('KeyA'))) UI.action('map-prev');
   if (s === 'menu' && (Input.consume('ArrowRight') || Input.consume('KeyD'))) UI.action('map-next');
-  if (s !== 'play') Input.dashReq = false;
+  if (s !== 'play') { Input.dashReq = false; Input.teleReq = false; }
   if (s === 'levelup') UI.levelUpKeys();
   if (s === 'chest' && (Input.consume('Enter') || Input.consume('Space') || Input.consume('KeyE'))) UI.closeChest();
   if (s === 'dead' && performance.now() - G.deadAt > 600) {

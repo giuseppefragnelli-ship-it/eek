@@ -29,8 +29,12 @@ const Spawner = {
       if (!Boss.warnedWin && t >= WIN.warnAt) { Boss.warnedWin = true; UI.toast('Avviso di sistema', "Ancora un poco: l'uscita è vicina...", 5); }
       if (t >= WIN.time) winRun();
     }
-    // minuto 10 (solo se hai continuato): i tre boss della mappa insieme, e gli slime si fanno più forti
+    // solo se hai continuato: subito i due guardiani della mappa, al minuto 10 tutti e tre (e slime più forti)
     if (G.endless) {
+      if (Boss.duoT > 0 && !Boss.spawnedDuo) {
+        if (!Boss.warnedDuo && t >= Boss.duoT - DUO.warnBefore) { Boss.warnedDuo = true; UI.toast('Avviso di sistema', G.map.b3.warn, 5); }
+        if (t >= Boss.duoT) spawnBossDuo();
+      }
       if (!Boss.warnedTrio && t >= TRIO.warnAt) {
         Boss.warnedTrio = true;
         UI.toast('Avviso di sistema', 'La terra trema. Non ne arriva uno: ne arrivano tre.', 6);
@@ -81,7 +85,7 @@ function pickEnemyType(t) {
   const r = Math.random();
   if (t < 30) return r < 0.55 ? ET.drop : r < 0.8 ? ET.heavy : ET.fast;
   if (t < 90) return r < 0.4 ? ET.drop : r < 0.7 ? ET.heavy : ET.fast;
-  const sp = 0.15 * G.map.spitter;   // quota Sputacchini (più alta nella Cattedrale)
+  const sp = SPIT.share * G.map.spitter;   // quota Arcieri (più alta nella Cattedrale)
   return r < sp ? ET.spitter : r < sp + 0.33 ? ET.drop : r < sp + 0.58 ? ET.heavy : ET.fast;
 }
 

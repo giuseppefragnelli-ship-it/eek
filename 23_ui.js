@@ -43,6 +43,15 @@ const UI = {
       db.classList.add('hit'); setTimeout(() => db.classList.remove('hit'), 120);
     });
     db.addEventListener('contextmenu', (e) => e.preventDefault());
+    // tasto TELE (telefono, solo dopo lo sblocco del teletrasporto)
+    const tb = $('telebtn');
+    tb.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      Sfx.unlock();
+      if (G.state === 'play') Input.teleReq = true;
+      tb.classList.add('hit'); setTimeout(() => tb.classList.remove('hit'), 120);
+    });
+    tb.addEventListener('contextmenu', (e) => e.preventDefault());
     // suggerimenti a rotazione nel menu
     this.tipIdx = (Math.random() * TIPS.length) | 0;
     this.showMenuTip();
@@ -67,15 +76,17 @@ const UI = {
       case 'options-close': this.closeOptions(); break;
       case 'village': case 'shop': goToVillage(); break;
       case 'shop-close': this.closeShop(); break;
-      case 'talk': if (G.state === 'village') Village.talk(); break;
+      case 'talk': if (G.state === 'village') Village.talk(); else if (G.state === 'play') Camp.talk(); break;
       case 'menu': goToMenu(); break;
       case 'resume': if (G.state === 'paused') setState('play'); break;
       case 'restart': startRun(); break;
       case 'continue': continueEndless(); break;
+      case 'reroll': this.reroll(); break;
       case 'chest-close': this.closeChest(); break;
       case 'tip-next': this.nextMenuTip(); break;
       case 'map-prev': this.stepMap(-1); break;
       case 'map-next': this.stepMap(1); break;
+      case 'mode-incubo': case 'mode-facile': this.setMode(a.slice(5)); break;
       case 'chars': if (G.state === 'menu') this.openShop('inn', 'menu'); break;
       case 'shop-up': this.shopAction('shopup', this.shopVendor); break;
       case 'save-export': this.saveExport(); break;
@@ -96,19 +107,22 @@ const UI = {
     for (const c of Array.from(bc)) if (c.indexOf('st-') === 0) bc.remove(c);
     bc.add('st-' + s);
     $('dashbtn').classList.toggle('left', Save.data.settings.joy === 'right');
+    $('telebtn').classList.toggle('left', Save.data.settings.joy === 'right');
+    bc.toggle('has-tele', Save.unlocked('teleport'));
     $('m-menu').classList.toggle('show', s === 'menu');
     $('m-records').classList.toggle('show', s === 'records');
     $('m-shop').classList.toggle('show', s === 'shop');
     $('m-options').classList.toggle('show', s === 'options');
     const inVillage = s === 'village' || (s === 'shop' && this.shopReturn === 'village') || (s === 'options' && this.optReturn === 'village');
     $('desktop').classList.toggle('show', s === 'menu' || s === 'records' || (s === 'options' && this.optReturn === 'menu'));
-    if (s !== 'village') $('vprompt').classList.remove('show');
-    else if (Village.near) $('vprompt').classList.add('show');
+    if (s === 'village') { if (Village.near) $('vprompt').classList.add('show'); }
+    else if (s === 'play' && G.scene === 'run' && Camp.near) this.runPrompt(true);   // il Magister nella Cattedrale
+    else $('vprompt').classList.remove('show');
     $('m-levelup').classList.toggle('show', s === 'levelup');
     $('m-pause').classList.toggle('show', s === 'paused');
     $('m-chest').classList.toggle('show', s === 'chest');
     $('m-dead').classList.toggle('show', s === 'dead');
-    $('hud').classList.toggle('show', s === 'play' || s === 'levelup' || s === 'paused' || s === 'chest' || s === 'dying' || (s === 'options' && this.optReturn === 'paused'));
+    $('hud').classList.toggle('show', s === 'play' || s === 'levelup' || s === 'paused' || s === 'chest' || s === 'dying' || (s === 'options' && this.optReturn === 'paused') || (s === 'shop' && this.shopReturn === 'run'));
     if (s === 'paused') this.renderBuild();
     $('startbtn').classList.toggle('pressed', s === 'paused');
     if (s === 'menu') this.refreshMenu();
@@ -158,7 +172,8 @@ const UI = {
     // etichette: vinta, record, forza degli slime, monete
     const tags = [];
     if (d.wins[id]) tags.push(['won', '✓ vinta']);
-    const rec = d.records[id + '/' + d.difficulty];
+    const df = Save.diffFor(id), rec = d.records[id + '/' + df];
+    if (df !== DEFAULT_DIFFICULTY) tags.push(['danger', DIFFICULTY[df].label.toUpperCase() + ' · dannati x10']);
     if (open && rec && rec.t > 0) tags.push(['rec', 'record ' + fmtTime(rec.endless || rec.t)]);
     if (m.hp > 1) tags.push(['danger', 'hostes x' + m.hp]);
     if (m.coin > 1) tags.push(['coin', 'monete x' + m.coin]);
@@ -171,9 +186,21 @@ const UI = {
     // tasto Gioca
     const pb = $('play-btn');
     pb.disabled = !open;
-    $('play-label').textContent = open ? 'GIOCA' : '🔒 Mappa bloccata';
+    $('play-label').textContent = open ? (df !== DEFAULT_DIFFICULTY ? 'GIOCA (' + DIFFICULTY[df].label + ')' : 'GIOCA') : '🔒 Mappa bloccata';
+    // MODALITÀ: dove vale la Facile (solo il Cocito, dopo lo sblocco) si sceglie qui
+    const fd = DIFFICULTY.facile, mm = $('map-mode'), canF = open && id === fd.map && Save.unlocked(fd.unlock);
+    mm.hidden = !canF;
+    if (canF) mm.innerHTML = '<span>Modalità</span><button class="btn mini' + (df === 'facile' ? '' : ' on') + '" data-act="mode-incubo">Incubo</button>' +
+      '<button class="btn mini' + (df === 'facile' ? ' on' : '') + '" data-act="mode-facile">Facile</button>';
     // lo sfondo del menu mostra la mappa scelta
     setMenuBackdrop(id);
+  },
+
+  // sceglie la modalità (vale solo dove la Facile è ammessa: vedi Save.diffFor)
+  setMode(id) {
+    if (!DIFFICULTY[id] || (DIFFICULTY[id].unlock && !Save.unlocked(DIFFICULTY[id].unlock))) return;
+    Save.data.difficulty = id; Save.write();
+    this.renderMap();
   },
 
   // anteprima della mappa: pavimento + ostacoli + i suoi slime (generata una volta sola)
@@ -248,6 +275,12 @@ const UI = {
       }
       txt += '\n';
     }
+    // Facile: una riga sola (vale solo su una mappa)
+    const FD = DIFFICULTY.facile;
+    if (Save.unlocked(FD.unlock)) {
+      const r = d.records[FD.map + '/facile'];
+      txt += pad(MAPS[FD.map].short + ' Facile', 15) + (r && r.t > 0 ? fmtTime(r.endless || r.t) + (r.win ? ' ★' + (r.win > 1 ? r.win : '') : '') + (r.endless ? '∞' : '') : '--') + '\n';
+    }
     txt += '\nCARRIERA\n========\n';
     txt += pad('Partite giocate', 22) + d.runs + '\n';
     txt += pad('Dannati uccisi', 22) + st.kills.toLocaleString('it-IT') + '\n';
@@ -258,6 +291,19 @@ const UI = {
     txt += pad('Livello massimo', 22) + d.bestLevel + '\n';
     txt += pad('Missioni completate', 22) + Object.keys(d.quests).length + ' / ' + QUESTS.length + '\n';
     txt += pad('Monete totali', 22) + d.totalCoins + '\n';
+    txt += pad('Arcanum [?]', 22) + (d.arcana || 0) + '\n';
+    // sblocchi segreti: cosa serve per averli
+    txt += '\nSEGRETI\n=======\n';
+    for (const id in UNLOCKS) {
+      const u = UNLOCKS[id], got = Save.unlocked(id);
+      txt += pad(got ? u.name : '???', 22) + (got ? u.kind + ' — sbloccato' : u.hint) + '\n';
+    }
+    // fusioni uniche: quelle già fatte col nome, le altre col nome delle due armi
+    txt += '\nFUSIONI UNICHE (Arcanum [?])\n============================\n';
+    for (const k in FUSION_SPECIAL) {
+      const ids = k.split('+'), pair = WEAPON_DEFS[ids[0]].name + ' + ' + WEAPON_DEFS[ids[1]].name;
+      txt += pad(d.fusions[k] ? FUSION_SPECIAL[k].name : '???', 22) + pair + '\n';
+    }
     $('records-text').textContent = txt;
     setState('records');
   },
@@ -359,6 +405,14 @@ const UI = {
     el.classList.add('show');
   },
 
+  // prompt "Parla con il Magister" in partita (Cattedrale)
+  runPrompt(on) {
+    const el = $('vprompt');
+    if (!on || G.state !== 'play') { el.classList.remove('show'); return; }
+    $('vprompt-text').textContent = 'Parla con il Magister';
+    el.classList.add('show');
+  },
+
   // ---- negozio: finestre dei venditori del villaggio ------------------------------
   shopTab: 'items',
   shopVendor: 'weapons',
@@ -371,12 +425,14 @@ const UI = {
     inn:      { tab: 'chars',   title: 'Locanda',                ico: 'ico_mug',    say: '"Fatti non foste a viver come bruti."' },
     board:    { tab: 'quests',  title: 'Tabula',                 ico: 'board',      say: '"Fortes fortuna adiuvat."' },
     magister: { tab: 'mastery', title: 'Schola del Magister',    ico: 'ico_book',   say: '"Nulla dies sine linea."' },
+    magister_away: { tab: 'away', title: 'Schola del Magister',  ico: 'ico_book',   say: '"Torno subito." — c\'è scritto sulla porta.' },
     haruspex: { tab: 'omens',   title: "Templum dell'Aruspice",  ico: 'ico_greed',  say: '"Alea iacta est."' },
   },
 
   closeShop() {
     if (G.state !== 'shop') return;
     if (this.shopReturn === 'village') { setState('village'); this.villagePrompt(Village.near); }
+    else if (this.shopReturn === 'run') { Player.invT = Math.max(Player.invT, 1.2); acc = 0; setState('play'); }   // dal Magister nella Cattedrale: si riprende
     else goToMenu();
   },
 
@@ -445,7 +501,21 @@ const UI = {
                    : done ? '<button class="btn default" data-buy="quest" data-id="' + q.id + '">Riscuoti ' + this.price(q.reward) + '</button>'
                           : '<button class="btn" disabled>' + this.price(q.reward) + '</button>') + '</div>';
       }
+    } else if (this.shopTab === 'away') {
+      // il Magister non c'è più: è sceso nella Cattedrale (MAGISTER_CAMP)
+      const open = Save.mapUnlocked(MAGISTER_CAMP.map);
+      h = '<div class="hint" style="padding:10px;line-height:1.5">"Sono sceso a studiare tra le rovine della ' + MAPS[MAGISTER_CAMP.map].name.replace(/^La /, '') +
+        '. Chi cerca i miei studi o un Arcanum [?] parta da lì e cammini verso destra, più o meno un minuto: seguite la lanterna."<br>— il Magister' +
+        (open ? '' : '<br><br>(La ' + MAPS[MAGISTER_CAMP.map].short + ' si apre vincendo ' + MAPS[MAPS[MAGISTER_CAMP.map].unlock].name.replace(/^La /, 'la ') + '.)') + '</div>';
     } else if (this.shopTab === 'mastery') {
+      // ARCANUM [?]: fusione di due armi al massimo (si consuma in partita, dalla carta FUSIONE del level up)
+      const na = d.arcana || 0, full = na >= ARCANUM.max;
+      h += '<div class="srow arow"><div class="simg sunken"><img src="' + SPR.url[ARCANUM.icon] + '"></div>' +
+        '<div><span class="sname">' + ARCANUM.name + '</span><span class="slv">x' + na + '</span>' +
+        '<div class="sdesc">Due armi al massimo (Lv 5 o evolute) si fondono in una più forte: un posto libero, +' + Math.round((FUSION.dmg - 1) * 100) +
+        '% danno, ricarica più breve, +area, +1 colpo. Esce come carta nel level up. Cinque coppie hanno una fusione unica (vedi Record.txt).</div></div>' +
+        (full ? '<button class="btn" disabled>Pieno</button>'
+              : '<button class="btn" data-buy="arcanum" data-id="arcanum"' + (d.coins < ARCANUM.price ? ' disabled' : '') + '>Compra ' + this.price(ARCANUM.price) + '</button>') + '</div>';
       for (const id in PASSIVE_DEFS) {
         if (MASTERY.exclude.indexOf(id) >= 0) continue;
         const p = PASSIVE_DEFS[id], r = Save.masteryRank(id), max = r >= MASTERY.max, cost = Save.masteryCost(id);
@@ -551,8 +621,10 @@ const UI = {
       if (Save.upgradeShop(id)) { Sfx.play('anvil'); this.shopMsg('Bottega migliorata! ' + SHOP_UPGRADES[id].unlocks[Save.shopLevel(id) - 1] + '.', 'ok'); }
     } else if (kind === 'qcat') {
       this.questCat = id;
+    } else if (kind === 'arcanum') {
+      if (Save.buyArcanum()) { Sfx.play('buy'); this.shopMsg(ARCANUM.name + ' comprato! Ne hai ' + Save.data.arcana + '. Porta due armi al massimo e fondile dal level up.', 'ok'); }
     } else if (kind === 'mastery') {
-      if (Save.buyMastery(id)) { Sfx.play('quest'); this.shopMsg(PASSIVE_DEFS[id].name + ' ' + 'I II III'.split(' ')[Save.masteryRank(id) - 1] + '.', 'ok'); }
+      if (Save.buyMastery(id)) { if (G.scene === 'run') Player.recalcStats(); Sfx.play('quest'); this.shopMsg(PASSIVE_DEFS[id].name + ' ' + 'I II III'.split(' ')[Save.masteryRank(id) - 1] + '.', 'ok'); }
     } else if (kind === 'omen') {
       const [item, sl] = id.split(':'), o = Save.readOmen(item, +sl);
       if (o) {
@@ -579,8 +651,20 @@ const UI = {
   },
 
   // ---- level up ---------------------------------------------------------------
-  openLevelUp() {
-    const opts = Upgrades.roll();
+  openLevelUp() { this.showCards(Upgrades.roll()); },
+
+  // rilancia le 3 carte (REROLL.perRun a partita): escono prima carte diverse da quelle appena viste
+  reroll() {
+    if (G.state !== 'levelup' || G.rerolls <= 0) return;
+    G.rerolls--;
+    Sfx.play('click');
+    this.showCards(Upgrades.roll(Upgrades.options));
+  },
+
+  showCards(opts) {
+    const rb = $('reroll-btn');
+    $('reroll-n').textContent = G.rerolls;
+    rb.disabled = G.rerolls <= 0;
     const box = $('cards');
     box.innerHTML = '';
     this.cardEls = [];
@@ -588,9 +672,12 @@ const UI = {
     opts.forEach((o, i) => {
       const d = Upgrades.describe(o);
       const b = document.createElement('button');
-      b.className = 'btn card' + (d.evo ? ' evo' : '');
+      b.className = 'btn card' + (d.evo ? ' evo' : '') + (d.fuse ? ' fuse' : '') + (d.secret ? ' secret' : '');
+      // fusione: le due armi una sopra l'altra + lo scrigno [?] nell'angolo
+      const img = d.fuse ? '<img class="f1" src="' + iconUrl(weaponIcon(d.fw[0]), d.fw[0].evolved) + '"><img class="f2" src="' + iconUrl(weaponIcon(d.fw[1]), d.fw[1].evolved) + '"><img class="fq" src="' + SPR.url[d.icon] + '">'
+        : '<img src="' + ((d.evo ? SPR.neonUrl(d.icon) : SPR.url[d.icon]) || '') + '">';
       b.innerHTML =
-        '<div class="ch"><div class="cimg sunken"><img src="' + (SPR.url[d.icon] || '') + '"></div>' +
+        '<div class="ch"><div class="cimg sunken' + (d.fuse ? ' fimg' : '') + '">' + img + '</div>' +
         '<div><div class="cname"></div><div class="ckind"></div></div></div>' +
         '<div class="badge"></div><div class="cdesc"></div><div class="ckey">[' + (i + 1) + ']</div>';
       b.querySelector('.cname').textContent = d.name;
@@ -627,6 +714,7 @@ const UI = {
     if (Input.consume('Digit1') || Input.consume('Numpad1')) this.pick(0);
     else if (Input.consume('Digit2') || Input.consume('Numpad2')) this.pick(1);
     else if (Input.consume('Digit3') || Input.consume('Numpad3')) this.pick(2);
+    else if (Input.consume('KeyR')) this.reroll();
     else if (Input.consume('ArrowLeft') || Input.consume('KeyA')) this.select(this.sel <= 0 ? 2 : this.sel - 1);
     else if (Input.consume('ArrowRight') || Input.consume('KeyD')) this.select(this.sel >= 2 ? 0 : this.sel + 1);
     else if ((Input.consume('Enter') || Input.consume('Space')) && this.sel >= 0) this.pick(this.sel);
@@ -647,12 +735,23 @@ const UI = {
           s.title = (isW && it.evolved ? it.def.evo.name : it.def.name) + ' — Lv ' + it.level;
           let pips = '';
           for (let k = 0; k < lvMax; k++) pips += '<i class="' + (k < it.level ? 'on' : '') + '"></i>';
-          s.innerHTML = '<img src="' + (SPR.url[icon] || '') + '"><div class="pips">' + pips + '</div>';
+          s.innerHTML = '<img src="' + ((isW && it.evolved ? SPR.neonUrl(icon) : SPR.url[icon]) || '') + '"><div class="pips">' + pips + '</div>';
         }
         box.appendChild(s);
       }
     };
-    mk('wslots', Player.weapons.filter((w) => !w.gear), CFG.MAX_WEAPONS, true);
+    mk('wslots', Player.weapons.filter((w) => !w.gear && !w.fusedInto), CFG.MAX_WEAPONS, true);
+    // armi fuse: un posto solo con le due icone e il bordo magenta
+    const wb = $('wslots').children;
+    let k = 0;
+    for (const w of Player.weapons) {
+      if (w.gear || w.fusedInto) continue;
+      const el = wb[k++];
+      if (!w.fusedWith || !el) continue;
+      el.classList.add('fuse');
+      el.title = fuseName(w, w.fusedWith) + ' (fuse)';
+      el.innerHTML = '<img class="f1" src="' + iconUrl(weaponIcon(w), w.evolved) + '"><img class="f2" src="' + iconUrl(weaponIcon(w.fusedWith), w.fusedWith.evolved) + '">';
+    }
     const gear = Player.weapons.find((w) => w.gear);
     if (gear) {
       const s = document.createElement('div');
@@ -672,7 +771,7 @@ const UI = {
     if (Player.level !== this._lvl) { this._lvl = Player.level; $('lvl').textContent = 'LV ' + Player.level; }
     if (G.kills !== this._kills) { this._kills = G.kills; $('t-kills').textContent = G.kills; }
 
-    const inMenu = G.state === 'menu' || G.state === 'records' || G.state === 'shop' || G.state === 'village' || (G.state === 'options' && this.optReturn !== 'paused');
+    const inMenu = G.state === 'menu' || G.state === 'records' || (G.state === 'shop' && this.shopReturn !== 'run') || G.state === 'village' || (G.state === 'options' && this.optReturn !== 'paused');
     const coins = inMenu ? Save.data.coins : G.runCoins;
     if (coins !== this._coins) { this._coins = coins; $('t-coins').textContent = coins; }
 
@@ -696,6 +795,17 @@ const UI = {
         const b = $('dashbtn');
         b.style.setProperty('--cd', q);
         b.classList.toggle('ready', q >= 1);
+      }
+      // tasto TELE: stesso anello di ricarica
+      if (Player.tele) {
+        const tcd = TELEPORT.cd * Player.cdMult;
+        const rt = Player.teleCd > 0 ? Math.max(0, Math.min(1, 1 - Player.teleCd / tcd)) : 1, qt = Math.round(rt * 40) / 40;
+        if (qt !== this._teleQ) {
+          this._teleQ = qt;
+          const b = $('telebtn');
+          b.style.setProperty('--cd', qt);
+          b.classList.toggle('ready', qt >= 1);
+        }
       }
     }
 
@@ -730,14 +840,23 @@ const UI = {
     this._bossPct = -1;
   },
 
-  _toastTimer: 0,
-  toast(title, msg, secs) {
+  _toastTimer: 0, _toastHold: 0, _toastNext: null,
+  // important = resta su per tutti i suoi secondi: gli avvisi normali arrivati nel frattempo aspettano la fine
+  // (es. lo sblocco segreto all'11:00 cade proprio sull'"Aurora" della notte)
+  toast(title, msg, secs, important) {
+    const now = performance.now();
+    if (!important && now < this._toastHold) { this._toastNext = [title, msg, secs]; return; }
+    this._toastHold = important ? now + (secs || 4) * 1000 : 0;
     $('toast-title').textContent = title;
     $('toast-msg').textContent = msg;
     const el = $('toast');
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => el.classList.remove('show'), (secs || 4) * 1000);
+    this._toastTimer = setTimeout(() => {
+      el.classList.remove('show');
+      const n = this._toastNext; this._toastNext = null;
+      if (n && important) setTimeout(() => this.toast(n[0], n[1], n[2]), 250);
+    }, (secs || 4) * 1000);
   },
 
   setDebug(on) { $('w-debug').classList.toggle('show', on); },
@@ -763,21 +882,20 @@ const UI = {
     $('d-coins').textContent = '+' + G.runCoins;
     $('d-bonus').textContent = '+' + (G.runBonus || 0) + '  (' + COIN.perMinute * G.diff.coin + '/min)';
     $('d-bank').textContent = Save.data.coins;
-    // danno per arma, dalla più forte
-    const ws = Player.weapons.slice().sort((a, c) => c.dealt - a.dealt);
-    const tot = ws.reduce((n, w) => n + w.dealt, 0) || 1;
+    // danno per arma, dalla più forte (due armi fuse = una riga sola)
+    const ws = weaponRows().sort((a, c) => c.dealt - a.dealt);
+    const tot = ws.reduce((n, r) => n + r.dealt, 0) || 1;
     let h = '';
-    for (const w of ws) {
-      const icon = weaponIcon(w);
-      const pct = Math.round(w.dealt / tot * 100);
-      h += '<div class="wrow"><img src="' + SPR.url[icon] + '"><span class="wn"></span><span class="wd">' + Math.round(w.dealt).toLocaleString('it-IT') +
+    for (const r of ws) {
+      const w = r.w, pct = Math.round(r.dealt / tot * 100);
+      h += '<div class="wrow' + (w.evolved ? ' evo' : '') + (r.f ? ' fuse' : '') + '"><img src="' + iconUrl(weaponIcon(w), w.evolved) + '"><span class="wn"></span><span class="wd">' + Math.round(r.dealt).toLocaleString('it-IT') +
         '</span><div class="wbar"><i style="width:' + pct + '%"></i></div></div>';
     }
     $('d-weapons').innerHTML = h || '<div class="hint">Nessun danno.</div>';
-    $('d-weapons').querySelectorAll('.wn').forEach((el, k) => { el.textContent = weaponName(ws[k]); });
+    $('d-weapons').querySelectorAll('.wn').forEach((el, k) => { el.textContent = ws[k].name; });
     const r = Save.data.records[G.mapId + '/' + G.diffId];
     let rec = record ? 'NUOVO RECORD per ' + G.map.short + '!' : 'Record su questa mappa: ' + fmtTime(r ? (r.endless || r.t) : 0);
-    if (victory) rec = 'Mappa completata!' + (unlocked ? ' Hai sbloccato: ' + unlocked + '.' : '') + ' Bonus vittoria: +' + WIN.reward.coins * G.diff.coin + ' monete. Se continui, al minuto 10 arrivano tre boss insieme.';
+    if (victory) rec = 'Mappa completata!' + (unlocked ? ' Hai sbloccato: ' + unlocked + '.' : '') + ' Bonus vittoria: +' + WIN.reward.coins * G.diff.coin + ' monete. Se continui, arrivano subito i due guardiani della mappa, e al minuto 10 tutti e tre i boss.';
     $('d-record').textContent = rec;
     $('d-quests').hidden = true;
   },
@@ -788,7 +906,7 @@ const UI = {
     $('chest-title').textContent = list.length > 1 ? 'Forziere pieno! ' + list.length + ' potenziamenti' : 'Hai aperto un forziere!';
     let h = '';
     for (const d of list) {
-      h += '<div class="crow' + (d.evo ? ' evo' : '') + '"><img src="' + (SPR.url[d.icon] || '') + '"><div><b></b><span class="cb"></span><div class="cd"></div></div></div>';
+      h += '<div class="crow' + (d.evo ? ' evo' : '') + '"><img src="' + ((d.evo ? SPR.neonUrl(d.icon) : SPR.url[d.icon]) || '') + '"><div><b></b><span class="cb"></span><div class="cd"></div></div></div>';
     }
     const box = $('chest-list');
     box.innerHTML = h;
@@ -810,9 +928,10 @@ const UI = {
   renderBuild() {
     const P = Player;
     let h = '<div class="build"><div><div class="end-h2">Armi</div>';
-    for (const w of P.weapons) {
-      h += '<div class="brow"><img src="' + SPR.url[weaponIcon(w)] + '"><span>' + esc(weaponName(w)) + '</span><b>' + Math.round(w.dealt).toLocaleString('it-IT') + '</b></div>';
+    for (const r of weaponRows()) {
+      h += '<div class="brow' + (r.f ? ' fuse' : '') + '"><img src="' + SPR.url[weaponIcon(r.w)] + '"><span>' + esc(r.name) + '</span><b>' + Math.round(r.dealt).toLocaleString('it-IT') + '</b></div>';
     }
+    if ((Save.data.arcana || 0) > 0) h += '<div class="hint">' + ARCANUM.name + ': ' + Save.data.arcana + ' (fondi due armi al massimo dal level up)</div>';
     h += '<div class="end-h2" style="margin-top:6px">Passive</div>';
     if (!P.passives.length) h += '<div class="hint">Nessuna.</div>';
     for (const p of P.passives) h += '<div class="brow"><img src="' + SPR.url[p.def.icon] + '"><span>' + esc(p.def.name) + '</span><b>Lv ' + p.level + '</b></div>';
@@ -848,6 +967,17 @@ function weaponIcon(w) {
   if (w.gear) return SPR.itemIcon(w.id, w.level - 1);
   return w.evolved ? w.def.evo.icon : w.def.icon;
 }
+function iconUrl(name, neon) { return (neon ? SPR.neonUrl(name) : SPR.url[name]) || ''; }
+// righe "armi" per pausa e resoconto: due armi fuse diventano una riga sola (nome doppio, danno sommato)
+function weaponRows() {
+  const out = [];
+  for (const w of Player.weapons) {
+    if (w.fusedInto) continue;
+    const f = w.fusedWith || null;
+    out.push({ w, f, name: f ? fuseName(w, f) : weaponName(w), dealt: w.dealt + (f ? f.dealt : 0) });
+  }
+  return out;
+}
 function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
 
 // Suggerimenti ("Lo sapevi che...")
@@ -856,13 +986,19 @@ const TIPS = [
   'SCATTO: premi Spazio (sul telefono il tasto SCATTO in basso, o doppio tocco) per uno scatto velocissimo in cui nessuno ti può colpire.',
   'Le monete restano salvate tra una partita e l\'altra. Spendile nel Villaggio: Armaiolo, Corazzaio, Fabbro e Locanda.',
   'Un\'arma al livello 5 + la passiva giusta = EVOLUZIONE. La carta della passiva ti dice quali armi fa evolvere.',
+  'Gli Arcieri tendono l\'arco prima di tirare: quando la linea di mira diventa bianca, scansati di lato o mettiti dietro una colonna. Una freccia fa malissimo.',
+  'Non ti piacciono le 3 carte? RILANCIA (tasto R): 3 rilanci a partita.',
   'Sul telefono il joystick appare dove tocchi. Se preferisci un joystick fisso, cambialo dalle Opzioni.',
   'In pausa (tasto II in alto a destra) vedi la tua build: danno fatto da ogni arma e tutte le statistiche.',
   'I Cacciatori (slime rossi con le corna) a volte lasciano un forziere: dentro ci sono 1 o 3 potenziamenti gratis.',
-  'Resisti 7 minuti per vincere la mappa e sbloccare la successiva. Poi puoi continuare: al minuto 10 arrivano tre boss insieme.',
+  'Resisti 7 minuti per vincere la mappa e sbloccare la successiva. Poi puoi continuare: arrivano subito i due guardiani della mappa, al minuto 10 tutti e tre i boss.',
   'La Bacheca nel Villaggio ha delle missioni: completale e torna a riscuotere le monete.',
   'Di notte gli slime diventano demoni: più veloci e più cattivi. Resta nella luce e non farti circondare.',
   'Il Fabbro può sempre fallire. Una Pietra del Fabbro (la lasciano i boss) aggiunge +30% di riuscita.',
   'Si gioca solo a Incubo: slime più veloci e cattivi, ma ogni moneta vale x5.',
   'Dalle Opzioni puoi esportare un codice di salvataggio per portare i progressi su un altro dispositivo.',
+  'Il Magister ha lasciato il Villaggio: lo trovi nella Cattedrale Sconsacrata, camminando verso destra per circa un minuto. Vende gli studi delle passive e l\'Arcanum [?].',
+  'Arcanum [?]: con due armi al massimo esce la carta FUSIONE, e diventano un\'arma sola, più forte, che occupa un posto solo.',
+  'Cinque coppie di armi hanno una FUSIONE UNICA con un effetto tutto loro. Nel Record.txt trovi quali coppie provare.',
+  'Alcune cose non si comprano: si guadagnano resistendo a lungo dopo la vittoria. Nel Record.txt trovi i SEGRETI ancora da sbloccare.',
 ];

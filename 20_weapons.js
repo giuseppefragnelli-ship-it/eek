@@ -26,13 +26,14 @@ function findWeapon(id) {
   return null;
 }
 
-function wStats(w) { return w.evolved ? w.def.evo.stats : w.def.levels[w.level - 1]; }
+// statistiche attuali: livello, evoluzione, oppure quelle potenziate della fusione (w.fx, calcolate una volta sola)
+function wStats(w) { return w.fx || (w.evolved ? w.def.evo.stats : w.def.levels[w.level - 1]); }
 // quanti proiettili spara l'arma: livello + Gemelli
 function amt(st) { return st.amount + Player.amount; }
 function wMaxed(w) { return w.evolved || w.level >= w.def.levels.length; }
 function canEvolve(w) { return !w.gear && !!w.def.evo && !w.evolved && w.level >= w.def.levels.length && Player.passiveLevel(w.def.evo.passive) > 0; }
-// armi "normali" (le 6 slot): l'arma dell'Armaiolo non conta
-function slotWeaponCount() { let n = 0; for (const w of Player.weapons) if (!w.gear) n++; return n; }
+// armi "normali" (le 6 slot): l'arma dell'Armaiolo non conta, e due armi fuse occupano un posto solo
+function slotWeaponCount() { let n = 0; for (const w of Player.weapons) if (!w.gear && !w.fusedInto) n++; return n; }
 
 function levelUpWeapon(w) { if (w.level < w.def.levels.length) w.level++; }
 function evolveWeapon(w) {
@@ -40,6 +41,86 @@ function evolveWeapon(w) {
   w.timer = 0.2;
   const st = w.def.evo.stats;
   if (st.slow) G.slowFactor = st.slow;
+  if (w.fx) fuseCalc(w);   // già fusa: le statistiche potenziate ripartono da quelle dell'evoluzione
+}
+
+// ---- FUSIONE (Arcanum [?]) ------------------------------------------------------
+// Le due armi restano due oggetti in Player.weapons (gli indici `slot` dei proiettili non cambiano):
+// la prima tiene il posto (w.fusedWith = l'altra), la seconda sparisce dalla HUD (w.fusedInto = la prima).
+function fuseCalc(w) {
+  const base = w.evolved ? w.def.evo.stats : w.def.levels[w.level - 1], F = FUSION, fx = Object.assign({}, base);
+  fx.dmg = base.dmg * F.dmg;
+  if (base.cd !== undefined) fx.cd = base.cd * F.cd;
+  if (base.amount !== undefined) fx.amount = base.amount + F.amount;
+  for (const k of F.areaKeys) if (base[k] !== undefined) fx[k] = base[k] * F.area;
+  w.fx = fx;
+}
+// armi che si possono fondere: al massimo, non dell'Armaiolo, non già fuse
+function fusable(w) { return !w.gear && !w.fusedWith && !w.fusedInto && wMaxed(w); }
+// coppie fondibili (solo al level up: qui allocare va bene)
+function fusionPairs() {
+  const ws = Player.weapons.filter(fusable), out = [];
+  for (let i = 0; i < ws.length; i++) for (let j = i + 1; j < ws.length; j++) out.push([ws[i], ws[j]]);
+  return out;
+}
+function fuseWeapons(a, b) {
+  if (!fusable(a) || !fusable(b) || a === b) return false;
+  if (b.slot < a.slot) { const t = a; a = b; b = t; }   // tiene il posto quella più a sinistra nella HUD
+  a.fusedWith = b; b.fusedInto = a;
+  a.special = b.special = FUSION_SPECIAL[fuseKey(a.id, b.id)] || null;   // fusione unica (o nessuna)
+  if (a.special) { Save.data.fusions[fuseKey(a.id, b.id)] = true; Save.write(); }
+  fuseCalc(a); fuseCalc(b);
+  a.timer = b.timer = 0.2;
+  spawnFx(FXK.RING, Player.x, Player.y, 0.5, 120);
+  addShake(3);
+  Sfx.play('fuse');
+  return true;
+}
+// nome delle armi come le vede il giocatore (evolute: nome dell'evoluzione)
+function baseWeaponName(w) { return w.evolved ? w.def.evo.name : w.def.name; }
+function fuseName(a, b) {
+  const sp = FUSION_SPECIAL[fuseKey(a.id, b.id)];
+  return sp ? sp.name : baseWeaponName(a) + ' + ' + baseWeaponName(b);
+}
+
+// ---- effetti delle FUSIONI UNICHE (ganci chiamati dalle armi; G.src = l'arma che colpisce) -------------
+const QBUF_CHAIN = new Int32Array(512), _chainHit = new Float32Array(8);
+// fulmine a catena da (x,y): salta sul dannato più vicino non ancora colpito, `n` volte (cerca con la Grid)
+function chainBolt(x, y, n, dmg, area) {
+  const E = Enemies;
+  let hitN = 0;
+  for (let c = 0; c < n; c++) {
+    const q = Grid.query(x, y, 170, QBUF_CHAIN);
+    let best = -1, bd = 170 * 170;
+    for (let k = 0; k < q; k++) {
+      const j = QBUF_CHAIN[k];
+      if (E.alive[j] === 0) continue;
+      let seen = false;
+      for (let h = 0; h < hitN; h++) if (_chainHit[h] === E.uid[j]) { seen = true; break; }
+      if (seen) continue;
+      const dx = E.x[j] - x, dy = E.y[j] - y, d2 = dx * dx + dy * dy;
+      if (d2 > 36 && d2 < bd) { bd = d2; best = j; }    // non lo stesso punto da cui parte
+    }
+    if (best < 0) break;
+    if (hitN < 8) _chainHit[hitN++] = E.uid[best];
+    const jx = E.x[best], jy = E.y[best];
+    const f = spawnFx(FXK.BOLT, jx, jy, 0.24, area, x, y);
+    if (f >= 0) FX.val[f] = BOLT_STYLE.capaneo;
+    spawnFx(FXK.FLARE, jx, jy, 0.2, area * 0.7);
+    damageArea(jx, jy, area, dmg, 20, 0);
+    x = jx; y = jy;
+  }
+  if (hitN) Sfx.play('zap');
+}
+// congela (ferma) i dannati normali nel cerchio; i boss no
+function freezeArea(x, y, r, dur) {
+  const E = Enemies, n = Grid.query(x, y, r + CFG.MAX_ENEMY_R, QBUF_CHAIN);
+  for (let k = 0; k < n; k++) {
+    const j = QBUF_CHAIN[k];
+    if (E.alive[j] === 0 || E.big[j] !== 0) continue;
+    const dx = E.x[j] - x, dy = E.y[j] - y, rr = r + E.r[j];
+    if (dx * dx + dy * dy < rr * rr) { E.frz[j] = dur; E.frzM[j] = FUSE_ICE; }
+  }
 }
 
 // Nemico vivo più vicino entro `range`, escludendo gli uid in `excl[0..exclN)`.
@@ -343,6 +424,7 @@ const WEAPON_LOGIC = {
         const dx = E.x[j] - ox, dy = E.y[j] - oy, rr = sz + E.r[j];
         if (dx * dx + dy * dy >= rr * rr) continue;
         E.orbCd[j] = hitCd;
+        if (w.special && w.special.fx === 'stelle') { E.frz[j] = w.special.freeze; E.frzM[j] = FUSE_ICE; }   // STELLE DI COCITO
         const px = E.x[j] - Player.x, py = E.y[j] - Player.y, d = Math.sqrt(px * px + py * py) || 1;
         damageEnemy(j, dmg, px / d, py / d, st.kb);
       }
@@ -554,6 +636,19 @@ function explodeBomb(i) {
   const P = Projectiles, x = P.x[i], y = P.y[i], aoe = P.aoe[i], dmg = P.dmg[i], split = P.split[i];
   damageArea(x, y, aoe, dmg, 90, 0);
   spawnFx(FXK.BOOM, x, y, 0.35, aoe);
+  // SABBIONE ARDENTE: resta una pozza di fuoco
+  const sp = G.src && G.src.special;
+  if (sp && sp.fx === 'sabbione') {
+    // se lì c'è già una pozza di fuoco, si ravviva quella (niente cerchi uno dentro l'altro)
+    const Z = Zones, r = aoe * sp.rK, slot = G.src.slot;
+    let k = 0;
+    for (; k < Z.count; k++) {
+      if (Z.alive[k] === 0 || Z.src[k] !== slot) continue;
+      const dx = Z.x[k] - x, dy = Z.y[k] - y;
+      if (dx * dx + dy * dy < r * r * 0.36) { Z.life[k] = Z.life0[k] = sp.dur; if (r > Z.r[k]) Z.r[k] = r; break; }
+    }
+    if (k === Z.count) spawnZone(x, y, r, sp.dur, dmg * sp.dmgK, false);
+  }
   Sfx.play('boom');
   addShake(split > 0 || aoe > 60 ? 2.5 : 1.5);
   if (split > 0) {
@@ -588,7 +683,12 @@ function updateProjectiles(dt) {
       P.vx[i] = hx * P.split[i]; P.vy[i] = hy * P.split[i];
       P.x[i] += P.vx[i] * dt; P.y[i] += P.vy[i] * dt;
       P.aoe[i] -= dt;
-      if (P.aoe[i] <= 0) { P.aoe[i] = D.tick; damageArea(P.x[i], P.y[i], P.r[i], P.dmg[i], P.kb[i], 0); }
+      if (P.aoe[i] <= 0) {
+        P.aoe[i] = D.tick; damageArea(P.x[i], P.y[i], P.r[i], P.dmg[i], P.kb[i], 0);
+        // VENTO DI LUCIFERO: il turbine congela chi trascina
+        const sp = G.src && G.src.special;
+        if (sp && sp.fx === 'lucifero') freezeArea(P.x[i], P.y[i], P.r[i], sp.freeze);
+      }
       if (P.life[i] <= 0) P.alive[i] = 0;
       continue;
     } else if (kind === PK.SCYTHE) {
@@ -675,6 +775,31 @@ function projHit(i, j, x, y, r) {
   if (slot === 0) P.h0[i] = uid; else if (slot === 1) P.h1[i] = uid; else if (slot === 2) P.h2[i] = uid; else P.h3[i] = uid;
   P.hn[i]++;
   damageEnemy(j, P.dmg[i], P.dx[i], P.dy[i], P.kb[i]);
+  if (P.kind[i] === PK.WISP) wispBurst(i, E.x[j], E.y[j]);
+  else if (P.kind[i] === PK.SALT && G.src && G.src.special && G.src.special.fx === 'giove' && Math.random() < G.src.special.chance) {
+    // STRALI DI GIOVE: il cristallo chiama un fulmine dal cielo sul bersaglio
+    const sp = G.src.special, ex = E.x[j], ey = E.y[j], a = sp.area * Player.areaMult;
+    const f = spawnFx(FXK.BOLT, ex, ey, 0.26, a, ex + (Math.random() - 0.5) * 50, ey - G.viewH * 0.5 - 40);
+    if (f >= 0) FX.val[f] = BOLT_STYLE.giove;
+    spawnFx(FXK.GLINT, ex, ey, 0.32, a);
+    damageArea(ex, ey, a, P.dmg[i] * sp.dmgK, 30, 0);
+    Sfx.play('zap');
+  }
   if (--P.pierce[i] <= 0) { P.alive[i] = 0; return true; }
   return false;
+}
+
+// Linguae Ignis: a ogni colpo la fiamma scoppia e brucia chi c'è attorno (G.src = l'arma, lo imposta updateProjectiles)
+function wispBurst(i, x, y) {
+  const w = G.src, st = w ? wStats(w) : null;
+  if (!st || !st.splash) return;
+  const r = st.splash * Player.areaMult;
+  damageArea(x, y, r, Projectiles.dmg[i] * WEAPON_DEFS.wisps.splashDmg, 40, 0);
+  spawnFx(FXK.FLARE, x, y, 0.24, r);
+  // FULMINI DI CAPANEO: lo scoppio lancia un fulmine a catena (al massimo uno ogni `every` secondi: costa)
+  const sp = w.special;
+  if (sp && sp.fx === 'capaneo' && G.time >= (w.boltT || 0)) {
+    w.boltT = G.time + sp.every;
+    chainBolt(x, y, sp.chain, Projectiles.dmg[i] * sp.chainDmg, 30 * Player.areaMult);
+  }
 }

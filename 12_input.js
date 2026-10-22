@@ -22,6 +22,7 @@ const Input = {
   JOY_MODES: { float: 'Mobile: appare dove tocchi', left: 'Fisso in basso a sinistra', right: 'Fisso in basso a destra' },
   stageW: 0, stageH: 0,
   dashReq: false, _lastTap: 0,  // doppio tocco = scatto
+  teleReq: false,               // tasto TELE (telefono) = teletrasporto
 
   joyMode() { return (Save.data && Save.data.settings.joy) || 'float'; },
 

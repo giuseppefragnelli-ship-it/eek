@@ -192,23 +192,27 @@ const WEAPON_DEFS = {
     flight: 0.5, range: 260, tick: 0.5,
   },
 
+  // ARMA SEGRETA e la PIÙ FORTE del gioco: non esce nelle carte finché non resisti fino all'11:00 nella Cripta
+  // (UNLOCKS in 05_data_maps.js). Fiamme nere, gialle e bianche che inseguono e a ogni colpo SCOPPIANO:
+  //   splash = raggio dello scoppio (x area) | splashDmg = quota del danno che fa lo scoppio a chi è attorno
+  // Danno triplicato rispetto alla vecchia versione normale (il 2026-10-22).
   wisps: {
-    name: 'Linguae Ignis', icon: 'ico_wisp',
-    desc: '"Ogni fiamma un peccatore invola."',
+    name: 'Linguae Ignis', icon: 'ico_wisp', secret: 'wisps',
+    desc: '"Ogni fiamma un peccatore invola." Fiamme che inseguono e scoppiano.',
     levels: [
-      { dmg: 14, cd: 1.6, amount: 2, speed: 220, pierce: 1 },
-      { dmg: 14, cd: 1.6, amount: 3, speed: 220, pierce: 1 },
-      { dmg: 19, cd: 1.5, amount: 3, speed: 240, pierce: 1 },
-      { dmg: 19, cd: 1.3, amount: 4, speed: 240, pierce: 2 },
-      { dmg: 24, cd: 1.2, amount: 5, speed: 260, pierce: 2 },
+      { dmg: 42, cd: 1.6, amount: 2, speed: 220, pierce: 1, splash: 30 },
+      { dmg: 42, cd: 1.6, amount: 3, speed: 220, pierce: 1, splash: 30 },
+      { dmg: 57, cd: 1.5, amount: 3, speed: 240, pierce: 1, splash: 34 },
+      { dmg: 57, cd: 1.3, amount: 4, speed: 240, pierce: 2, splash: 40 },
+      { dmg: 72, cd: 1.2, amount: 5, speed: 260, pierce: 3, splash: 48 },
     ],
-    upDesc: ['', '+1 fiammella', '+danno, più veloci', '+1 fiammella, perforano', '+danno, +1 fiammella'],
+    upDesc: ['', '+1 fiammella', '+danno, più veloci, scoppio più largo', '+1 fiammella, perforano', '+danno, +1 fiammella, perforano di più, scoppio più largo'],
     evo: {
       passive: 'cooldown', name: 'Folle Volo', icon: 'ico_wisp',
       desc: '"De\' remi facemmo ali al folle volo."',
-      stats: { dmg: 30, cd: 1.0, amount: 8, speed: 290, pierce: 3 },
+      stats: { dmg: 90, cd: 1.0, amount: 8, speed: 290, pierce: 3, splash: 50 },
     },
-    life: 3.0, turn: 7,
+    life: 3.0, turn: 7, splashDmg: 0.6,
   },
 
   // FLAGELLO — sferzate orizzontali: prima dalla parte in cui guardi, poi dietro, poi sopra e sotto
@@ -330,6 +334,39 @@ const PASSIVE_DEFS = {
 const PASSIVE_MAX = 5;
 // livello massimo di una passiva (Gemelli si ferma a 2)
 function pMax(id) { return PASSIVE_DEFS[id].max || PASSIVE_MAX; }
+
+// EVOLUZIONI: contorno verde evidenziatore su tutto ciò che disegnano (proiettili, aure, raggi, esplosioni,
+// icone nella HUD e nelle carte). Solo il contorno: l'interno resta scuro. In PAL è il colore '~'.
+const EVO_NEON = '#c8ff1e';
+
+// RILANCIO — nel level up puoi rilanciare le 3 carte se non ti piacciono (tasto R o il bottone). Tot per partita.
+const REROLL = { perRun: 3 };
+
+// FUSIONE — con un Arcanum [?] (lo vende il Magister) due armi al massimo (Lv 5 o evolute) si fondono in una:
+// occupano UN solo posto (se ne libera uno), sparano entrambe e diventano più forti. La carta esce nel level up.
+//   dmg / cd = moltiplicatori su danno e ricarica | area = su raggio, gittata, area e grandezza | amount = colpi in più
+const FUSION = { dmg: 1.5, cd: 0.8, area: 1.15, amount: 1, areaKeys: ['radius', 'range', 'area', 'size', 'reach', 'width', 'height', 'splash'] };
+const FUSE_NEON = '#ff4fd8';   // magenta: bordo delle armi fuse (HUD, carte, resoconto)
+
+// FUSIONI UNICHE — 5 coppie, oltre ai potenziamenti normali, hanno un nome e un effetto tutto loro.
+// Chiave = i due id in ordine alfabetico (fuseKey). `fx` = quale effetto (lo leggono i ganci in 20_weapons.js).
+const FUSION_SPECIAL = {
+  'lightning+wisps': { name: 'Fulmini di Capaneo', fx: 'capaneo', chain: 3, chainDmg: 0.6, every: 0.12,
+    desc: '"Qual io fui vivo, tal son morto." Ogni scoppio di fiamma lancia un fulmine a catena.' },
+  'frost+storm':     { name: 'Vento di Lucifero', fx: 'lucifero', freeze: 1.0,
+    desc: '"Quindi Cocito tutto s\'aggelava." I turbini congelano chi trascinano.' },
+  'acid+bomb':       { name: 'Sabbione Ardente', fx: 'sabbione', dur: 2.5, dmgK: 0.35, rK: 0.85,
+    desc: '"Sovra tutto \'l sabbion, d\'un cader lento." Ogni esplosione lascia una pozza di fuoco.' },
+  'dart+lightning':  { name: 'Strali di Giove', fx: 'giove', chance: 0.25, dmgK: 1.0, area: 34,
+    desc: '"Folgore e saetta." Un cristallo su quattro chiama un fulmine sul bersaglio.' },
+  'frost+orbit':     { name: 'Stelle di Cocito', fx: 'stelle', freeze: 0.8,
+    desc: '"E quindi uscimmo a riveder le stelle." Le ampolle congelano chi toccano.' },
+};
+function fuseKey(a, b) { return a < b ? a + '+' + b : b + '+' + a; }
+// ghiaccio delle fusioni uniche: frzM quasi zero (fermo come lo stordimento, ma Render lo disegna come un blocco di ghiaccio)
+const FUSE_ICE = 0.001;
+// stili dei fulmini (FX.val dei FXK.BOLT): 0 normale, 1 Capaneo (nero/giallo/bianco), 2 Giove (oro)
+const BOLT_STYLE = { normal: 0, capaneo: 1, giove: 2 };
 
 // Carte "di riserva" quando tutto è al massimo
 const FILLER_CARDS = {

@@ -28,6 +28,7 @@ const Player = {
   slowT: 0,        // gambe congelate (Traditore Gelido)
   throwT: 0,       // fotogramma del lancio (kunai)
   dashT: 0, dashCd: 0, dashX: 1, dashY: 0,   // SCATTO: durata residua, ricarica, direzione
+  tele: false, teleCd: 0,                    // TELETRASPORTO: sbloccato (UNLOCKS.teleport), ricarica
   trailN: 0, trailX: new Float32Array(8), trailY: new Float32Array(8), trailT: new Float32Array(8), trailF: new Int8Array(8),
   level: 1, xp: 0, xpNext: CFG.xpToNext(1),
   weapons: [],     // { id, def, level, evolved, timer, burst, burstT, angle, targets }
@@ -38,6 +39,7 @@ const Player = {
     this.facing = 1; this.view = 'f'; this.idleT = 0; this.hurtT = 0; this.invT = 0;
     this.dirX = 1; this.dirY = 0; this.lungeT = 0; this.slowT = 0; this.throwT = 0;
     this.dashT = 0; this.dashCd = 0; this.trailN = 0;
+    this.tele = Save.unlocked('teleport'); this.teleCd = 0;
     this.level = 1; this.xp = 0; this.xpNext = CFG.xpToNext(1);
     this.weapons.length = 0;
     this.passives.length = 0;
@@ -88,6 +90,7 @@ const Player = {
     if (this.slowT > 0) { this.slowT -= dt; spd *= FROST.slow; }
     if (this.throwT > 0) this.throwT -= dt;
     if (this.dashCd > 0) this.dashCd -= dt;
+    if (this.teleCd > 0) this.teleCd -= dt;
     // copie sbiadite dello scatto: invecchiano
     for (let k = 0; k < this.trailN; k++) this.trailT[k] -= dt;
     while (this.trailN > 0 && this.trailT[0] <= 0) { this.trailN--; for (let k = 0; k < this.trailN; k++) { this.trailX[k] = this.trailX[k + 1]; this.trailY[k] = this.trailY[k + 1]; this.trailT[k] = this.trailT[k + 1]; this.trailF[k] = this.trailF[k + 1]; } }
@@ -127,6 +130,32 @@ const Player = {
     this.invT = Math.max(this.invT, DASH.iframes);
     spawnFx(FXK.PUFF, this.x, this.y + 6, 0.3, 16);
     Sfx.play('dash');
+  },
+  // TELETRASPORTO (E/Q o il tasto TELE): sparisci e ricompari TELEPORT.dist più in là, dove stai andando
+  // (fermo: nell'ultima direzione). Scavalca i nemici; se atterri su un ostacolo lo step dopo ti spinge fuori.
+  tryTeleport() {
+    if (!this.tele || this.teleCd > 0 || G.state !== 'play') return;
+    const ax = Input.ax, ay = Input.ay, l = Math.sqrt(ax * ax + ay * ay);
+    const dx = l > 0 ? ax / l : this.dirX, dy = l > 0 ? ay / l : this.dirY, D = TELEPORT.dist;
+    spawnFx(FXK.PUFF, this.x, this.y + 4, 0.35, 18);
+    // copie sbiadite lungo il salto (la stessa scia dello scatto)
+    this.trailN = 0;
+    for (let k = 0; k < TELEPORT.ghosts && k < 8; k++) {
+      const f = k / TELEPORT.ghosts;
+      this.trailX[k] = this.x + dx * D * f; this.trailY[k] = this.y + dy * D * f;
+      this.trailT[k] = 0.12 + 0.2 * f; this.trailF[k] = this.facing;
+      this.trailN++;
+    }
+    this.dashT = 0;
+    this.x += dx * D; this.y += dy * D;
+    this.px = this.x; this.py = this.y;   // niente interpolazione: sparisce e ricompare
+    this.dirX = dx; this.dirY = dy;
+    if (dx > 0.2) this.facing = 1; else if (dx < -0.2) this.facing = -1;
+    this.teleCd = TELEPORT.cd * this.cdMult;
+    this.invT = Math.max(this.invT, TELEPORT.iframes);
+    spawnFx(FXK.RING, this.x, this.y, 0.3, 36);
+    spawnFx(FXK.PUFF, this.x, this.y + 4, 0.3, 14);
+    Sfx.play('tele');
   },
   endDash() {
     if (!this.kunai) return;

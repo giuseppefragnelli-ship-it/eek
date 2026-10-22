@@ -105,6 +105,8 @@ const QUESTS = [
 
 // MAGISTER — studia le passive: ogni grado = +20% all'effetto per livello (permanente)
 const MASTERY = { max: 3, bonus: 0.2, costs: [8, 15, 25], exclude: ['amount'] };
+// ARCANUM [?] — lo vende il Magister: una fusione di due armi al massimo (vedi FUSION). Si consuma quando fondi.
+const ARCANUM = { name: 'Arcanum [?]', icon: 'ico_arcanum', price: 15, max: 9 };
 
 // ARUSPICE — omina: bonus casuali su armi e armature (2 per oggetto). Le armi contano solo se equipaggiate.
 // rarità: 0 Vulgare, 1 Rarum, 2 Divinum

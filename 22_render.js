@@ -145,6 +145,40 @@ const Render = {
     }
   },
 
+  // VELO DELLA NOTTE: canvas a parte (pixel del gioco) riempito di blu-nero, con un buco netto attorno a (lx, ly)
+  // e un anello a retino sul bordo della luce; poi steso sopra al mondo in un colpo solo.
+  nightVeil(k, lx, ly, LR) {
+    const W = this.W, H = this.H;
+    let c = this.veilCv;
+    if (!c) { c = this.veilCv = document.createElement('canvas'); this.veilG = c.getContext('2d'); }
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; this.veilK = -1; }
+    // ridisegna il velo solo se cambia qualcosa (a notte piena e senza tremolio: mai)
+    if (this.veilK !== k || this.veilX !== lx || this.veilY !== ly || this.veilR !== LR) {
+      this.veilK = k; this.veilX = lx; this.veilY = ly; this.veilR = LR;
+      this._paintVeil(k, lx, ly, LR);
+    }
+    this.ctx.drawImage(c, 0, 0, W, H);
+  },
+  _paintVeil(k, lx, ly, LR) {
+    const W = this.W, H = this.H, g = this.veilG;
+    if (!this.veilPat) {   // scacchiera 50%
+      const d = document.createElement('canvas'); d.width = d.height = 2;
+      const dg = d.getContext('2d'); dg.fillRect(0, 0, 1, 1); dg.fillRect(1, 1, 1, 1);
+      this.veilPat = g.createPattern(d, 'repeat');
+    }
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, W, H);
+    g.globalAlpha = NIGHT.dark * k; g.fillStyle = '#02030b'; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+    g.globalCompositeOperation = 'destination-out';
+    const r0 = Math.max(4, LR - 12);
+    for (let dy = -LR; dy <= LR; dy++) {
+      const ho = Math.floor(Math.sqrt(LR * LR - dy * dy)), hi = Math.abs(dy) < r0 ? Math.floor(Math.sqrt(r0 * r0 - dy * dy)) : -1;
+      g.fillStyle = this.veilPat; g.fillRect(lx - ho, ly + dy, ho * 2 + 1, 1);           // bordo: metà dei pixel
+      if (hi >= 0) { g.fillStyle = '#000'; g.fillRect(lx - hi, ly + dy, hi * 2 + 1, 1); } // dentro: luce piena
+    }
+    g.globalCompositeOperation = 'source-over';
+  },
+
   // linea pixel (Bresenham)
   line(x0, y0, x1, y1) {
     const ctx = this.ctx;
@@ -163,6 +197,19 @@ const Render = {
   // segni sopra un nemico rallentato dal Gelo (azzurro), congelato (ghiaccio pieno) o stordito dal Flagello (stelline)
   frozen(wx, wy, r, m, rt) {
     const ctx = this.ctx, x = Math.round(wx / CFG.UNIT) + this.ox, y = Math.round(wy / CFG.UNIT) + this.oy, h = Math.max(3, Math.round(r / CFG.UNIT));
+    if (m > 0 && m < 0.01) {
+      // BLOCCO DI GHIACCIO (fusioni uniche: Vento di Lucifero, Stelle di Cocito): cristallo azzurro con spigoli e riflessi
+      const hw = h + 1, hh = h + 2;
+      ctx.globalAlpha = 0.55; this.ditherDisk(x, y - 1, hw, this.pat(PAL[']'])); ctx.globalAlpha = 1;
+      ctx.fillStyle = PAL['{'];
+      ctx.fillRect(x - hw, y - hh + 2, 1, hh * 2 - 3); ctx.fillRect(x + hw, y - hh + 3, 1, hh * 2 - 4);
+      ctx.fillRect(x - hw + 2, y - hh, hw * 2 - 3, 1); ctx.fillRect(x - hw + 1, y + hh - 1, hw * 2 - 1, 1);
+      ctx.fillStyle = PAL.w;
+      ctx.fillRect(x - hw + 2, y - hh + 2, 1, 3); ctx.fillRect(x - hw + 3, y - hh + 2, 2, 1);   // riflesso in alto a sinistra
+      if (((rt * 3 + x) | 0) % 4 === 0) ctx.fillRect(x + hw - 2, y + hh - 3, 1, 1);             // luccichio
+      ctx.fillStyle = PAL[']']; ctx.fillRect(x - 1, y - hh - 1, 1, 2); ctx.fillRect(x + 2, y - hh, 1, 1);   // punte
+      return;
+    }
     if (m === 0) {
       ctx.fillStyle = PAL[9];
       for (let k = 0; k < 3; k++) { const b = rt * 7 + k * 2.094; ctx.fillRect(x + Math.round(Math.cos(b) * (h + 1)), y - h - 2 + Math.round(Math.sin(b) * 1.5), 1, 1); }
@@ -171,6 +218,48 @@ const Render = {
     if (m < 0.2) { ctx.globalAlpha = 0.5; this.ditherDisk(x, y, h - 1, this.pat(PAL[']'])); ctx.globalAlpha = 1; }
     ctx.fillStyle = m < 0.2 ? PAL.w : PAL[']'];
     ctx.fillRect(x - h + 1, y - 1, 1, 1); ctx.fillRect(x + h - 2, y - h + 2, 1, 1); ctx.fillRect(x, y + h - 2, 1, 1);
+  },
+
+  // pozza di fuoco del Sabbione Ardente: brace scura, bordo arancio, fiammelle che salgono e scintille
+  firePool(x, y, r, fade, rt, seed) {
+    const ctx = this.ctx;
+    ctx.globalAlpha = 0.85 * fade; this.ditherDisk(x, y, r, this.pat(PAL.E));
+    ctx.globalAlpha = 0.75 * fade; this.ditherDisk(x, y, Math.max(1, (r * 0.75) | 0), this.pat(PAL.F));
+    ctx.globalAlpha = 0.6 * fade; this.ditherDisk(x, y, Math.max(1, (r * 0.4) | 0), this.pat(PAL.G)); ctx.globalAlpha = fade;
+    this.circle(x, y, r, (((rt * 6 + seed) | 0) & 1) ? PAL.G : PAL.P);
+    if (r > 4) this.circle(x, y, r - 1, PAL.F);
+    const n = Math.max(4, Math.round(r * 1.1));
+    for (let q = 0; q < n; q++) {
+      const a = q * 2.399 + seed, d = (q * 37 % 100) / 100 * (r - 2), fx = x + Math.round(Math.cos(a) * d), fy = y + Math.round(Math.sin(a) * d * 0.7);
+      const t = (rt * 2.2 + q * 0.37 + seed * 0.1) % 1, hgt = 2 + ((q * 7) % 3);
+      ctx.fillStyle = t < 0.5 ? PAL.P : PAL.G; ctx.fillRect(fx, fy - Math.round(t * 5), 1, hgt);
+      if (t < 0.25) { ctx.fillStyle = PAL.Y; ctx.fillRect(fx, fy - Math.round(t * 5) - 1, 1, 1); }
+      if (q % 3 === 0 && t > 0.6) { ctx.fillStyle = PAL.Z; ctx.fillRect(fx + 1, fy - 4 - Math.round(t * 6), 1, 1); }   // scintille che volano
+    }
+    ctx.globalAlpha = 1;
+  },
+
+  // turbine del Vento di Lucifero: vortice di ghiaccio azzurro/bianco con fiocchi che girano e brina alla base
+  iceStorm(sx, sy, r, spin, fade, i, rt) {
+    const ctx = this.ctx;
+    ctx.globalAlpha = 0.45 * fade; this.ditherDisk(sx, sy + Math.round(r * 0.35), Math.max(2, Math.round(r * 0.9)), this.pat(PAL[']'])); ctx.globalAlpha = fade;
+    for (let j = 0; j < 6; j++) {
+      const f = j / 5, rx = r * (0.25 + 0.75 * f), ry = Math.max(1, rx * 0.3);
+      const cy = sy + r * 0.35 - f * r * 1.4, cx = sx + Math.round(Math.sin(spin * 0.5 + j * 0.9) * (1 + f * 2));
+      const N = Math.max(10, Math.round(rx * 3));
+      for (let q = 0; q < N; q++) {
+        const a = q / N * 6.2832 + spin * (1 + f * 0.5), front = Math.sin(a) > 0;
+        if (!front && (q & 1)) continue;
+        ctx.fillStyle = front ? (j === 5 || j === 0 ? PAL.w : j > 2 ? PAL[']'] : PAL['{']) : PAL['}'];
+        ctx.fillRect(cx + Math.round(Math.cos(a) * rx), Math.round(cy + Math.sin(a) * ry), 1, 1);
+      }
+    }
+    // fiocchi di neve: piccole croci bianche che girano attorno
+    for (let q = 0; q < 4; q++) {
+      const a = spin * 1.1 + q * 1.571, fx = sx + Math.round(Math.cos(a) * r * 0.8), fy = sy - Math.round(r * (0.15 + 0.3 * q)) + Math.round(Math.sin(a) * r * 0.25);
+      ctx.fillStyle = PAL.w; ctx.fillRect(fx - 1, fy, 3, 1); ctx.fillRect(fx, fy - 1, 1, 3);
+      ctx.fillStyle = PAL[']']; ctx.fillRect(fx - 1, fy - 1, 1, 1); ctx.fillRect(fx + 1, fy + 1, 1, 1);
+    }
   },
 
   spr(s, img, wx, wy) {
@@ -201,23 +290,9 @@ const Render = {
     ctx.fillRect(cpx - (W >> 1) - 1, cpy - (H >> 1) - 1, W + 2, H + 2);
     ctx.setTransform(2, 0, 0, 2, 0, 0);
     drawMapLayer('props');
-    // notte: il pavimento sprofonda nel buio, tranne un cerchio di luce attorno a te
-    if (G.night) {
-      ctx.globalAlpha = 0.75; ctx.fillStyle = this.pat(PAL.k); ctx.fillRect(0, 0, W, H);
-      ctx.globalAlpha = 0.25; ctx.fillStyle = PAL.k; ctx.fillRect(0, 0, W, H);
-      ctx.globalAlpha = 1;
-      // luce: ridisegna il pavimento dentro il cerchio (a righe = bordo pixel netto), poi un anello a retino
-      const LR = Math.round(NIGHT.lightR * S), lx = (W >> 1) + shx, ly = (H >> 1) + shy;
-      ctx.setTransform(2, 0, 0, 2, ox * 2, oy * 2);
-      ctx.fillStyle = this.floorPat;
-      for (let dy = -LR; dy <= LR; dy++) {
-        const hw = Math.floor(Math.sqrt(LR * LR - dy * dy));
-        ctx.fillRect(lx - hw - ox, ly + dy - oy, hw * 2 + 1, 1);
-      }
-      ctx.setTransform(2, 0, 0, 2, 0, 0);
-      ctx.globalAlpha = 0.45; this.ditherRing(lx, ly, LR - 10, LR, PAL.k); ctx.globalAlpha = 1;
-    }
     drawMapLayer('obstacles');
+    const camp = Camp.here();
+    if (camp) Camp.drawGround(ctx, S, ox, oy, rt);   // accampamento del Magister (Cattedrale)
 
     // culling in unità mondo
     const mx = (W * 0.5 + 24) * U, my = (H * 0.5 + 24) * U;
@@ -232,7 +307,7 @@ const Render = {
       ctx.globalAlpha = w.pulse > 0 ? 0.6 : 0.3;
       this.ditherDisk(ppx, ppy, r, this.pat(w.evolved ? PAL.n : PAL.m));
       ctx.globalAlpha = w.pulse > 0 ? 1 : 0.7;
-      this.circle(ppx, ppy, r, w.evolved ? PAL[9] : PAL.p);
+      this.circle(ppx, ppy, r, w.evolved ? PAL['~'] : PAL.p);
       ctx.globalAlpha = 1;
     }
 
@@ -241,8 +316,10 @@ const Render = {
       if (Zones.alive[i] === 0) continue;
       const zx = Math.round(Zones.x[i] * S) + ox, zy = Math.round(Zones.y[i] * S) + oy;
       const zr = Math.round(Zones.r[i] * S), fade = Zones.life[i] < 0.5 ? Zones.life[i] * 2 : 1;
+      const zw = Zones.src[i] >= 0 ? Player.weapons[Zones.src[i]] : null;
+      if (zw && zw.special && zw.special.fx === 'sabbione' && zw.id === 'bomb') { this.firePool(zx, zy, zr, fade, rt, i); continue; }
       ctx.globalAlpha = 0.55 * fade; this.ditherDisk(zx, zy, zr, this.pat(Zones.slow[i] ? PAL.e : PAL.d)); ctx.globalAlpha = 1;
-      this.circle(zx, zy, zr, Zones.slow[i] ? PAL.e : PAL.c);
+      this.circle(zx, zy, zr, zw && zw.evolved ? PAL['~'] : Zones.slow[i] ? PAL.e : PAL.c);
       const b = ((rt * 3 + i) | 0) % 5;
       ctx.fillStyle = PAL.e;
       ctx.fillRect(zx + ((b * 7) % (zr + 1)) - (zr >> 1), zy + ((b * 5) % (zr + 1)) - (zr >> 1), 1, 1);
@@ -339,7 +416,51 @@ const Render = {
       ctx.fillStyle = PAL.k;
       ctx.fillRect(Math.round(x * S) + ox - 2, Math.round(y * S) + oy + 2, 5, 2);
       const sp = kd === PK.BOMB ? bs : SPR.cache.flask;
-      this.spr(sp, sp.img, x, y - h);
+      this.spr(sp, P.evo[i] ? sp.neon : sp.img, x, y - h);
+    }
+
+    // NOTTE: velo blu-nero su tutto il mondo (terreno, ostacoli, gemme, nemici, boss) tranne il cerchio di luce
+    // attorno a te; fuori dalla luce si vedono solo gli occhi rossi dei dannati. Le armi e i colpi restano sopra.
+    if (G.nightK > 0) {
+      const k = Math.ceil(G.nightK * 16) / 16, LR = Math.round(NIGHT.lightR * S * (1.6 - 0.6 * k));   // 16 gradini: il velo si ridisegna di rado
+      this.nightVeil(k, ppx, ppy, LR);
+      if (k > 0.5) {
+        ctx.globalAlpha = (k - 0.5) * 2; ctx.fillStyle = PAL.D;
+        const r2 = (LR - 6) * (LR - 6);
+        for (let i = 0; i < n; i++) {
+          if (E.alive[i] === 0 || E.big[i] !== 0) continue;
+          const sx = Math.round(E.x[i] * S) + ox, sy = Math.round(E.y[i] * S) + oy;
+          if (sx < 0 || sx >= W || sy < 0 || sy >= H) continue;
+          const dx = sx - ppx, dy = sy - ppy;
+          if (dx * dx + dy * dy < r2) continue;
+          const ey = sy - ((E.r[i] * S * 0.3) | 0);
+          ctx.fillRect(sx - 2, ey, 1, 1); ctx.fillRect(sx + 1, ey, 1, 1);
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+    if (camp) Camp.drawLit(ctx, S, ox, oy, rt);       // la lanterna del Magister si vede anche di notte
+
+    // ARCIERI che tendono l'arco: linea di mira tratteggiata (rossa mentre ti segue, bianca e fitta quando è bloccata).
+    // Sta sopra al velo della notte: il pericolo si vede sempre.
+    {
+      const SPT = ET.spitter, len = Math.round(SPIT.range * 1.15 * S);
+      for (let i = 0; i < n; i++) {
+        if (E.alive[i] === 0 || E.type[i] !== SPT || E.aiS[i] !== 1) continue;
+        const ax = Math.round((E.px[i] * ia + E.x[i] * alpha) * S) + ox, ay = Math.round((E.py[i] * ia + E.y[i] * alpha) * S) + oy;
+        if (ax < -len || ax > W + len || ay < -len || ay > H + len) continue;
+        const locked = E.aiT[i] <= SPIT.lock, ux = E.ddx[i], uy = E.ddy[i];
+        // trattini da 2 pixel con l'ombra nera (si leggono anche sull'erba); bloccata = bianca e fitta
+        const gap = locked ? 3 : 5, off = locked ? 0 : ((rt * 20) | 0) % gap;   // i trattini scorrono verso di te
+        for (let q = 10 + off; q <= len; q += gap) {
+          const x1 = ax + Math.round(ux * q), y1 = ay + Math.round(uy * q), x2 = ax + Math.round(ux * (q + 1)), y2 = ay + Math.round(uy * (q + 1));
+          ctx.fillStyle = PAL.k; ctx.fillRect(x1 + 1, y1 + 1, 1, 1); ctx.fillRect(x2 + 1, y2 + 1, 1, 1);
+          ctx.fillStyle = locked ? PAL.w : PAL.D; ctx.fillRect(x1, y1, 1, 1); ctx.fillRect(x2, y2, 1, 1);
+        }
+        // la corda che si tende: un puntino che arretra verso l'arciere
+        const p = 1 - Math.max(0, E.aiT[i]) / SPIT.tell;
+        ctx.fillStyle = PAL.P; ctx.fillRect(ax + Math.round(ux * (10 - p * 6)) - 1, ay + Math.round(uy * (10 - p * 6)) - 1, 2, 2);
+      }
     }
 
     // player
@@ -353,6 +474,8 @@ const Render = {
       PD.ta[k] = Math.max(0, Player.trailT[k] / 0.3) * 0.55; PD.tf[k] = Player.trailF[k];
     }
     PD.trail = Player.trailN; PD.e = ps;
+    PD.npc = camp ? Camp.hd(S, ox, oy, rt) : null;   // il Magister (alta risoluzione, sotto al personaggio)
+    PD.starN = 0;                                     // stelle di Cocito (le riempie il disegno delle ampolle qui sotto)
     const left = Player.facing < 0, hurt = Player.hurtT > 0;
     // nel menu la camera scorre da sola sulla mappa: niente personaggio
     const showMe = G.scene !== 'menu';
@@ -384,15 +507,32 @@ const Render = {
     for (let i = 0; i < Player.weapons.length; i++) {
       const w = Player.weapons[i];
       if (w.id !== 'orbit') continue;
-      const st = wStats(w), step = Math.PI * 2 / st.amount, R2 = st.radius * Player.areaMult;
-      for (let k = 0; k < st.amount; k++) {
+      // BUG risolto: si disegnavano st.amount ampolle, ma ne colpiscono amt(st) (Gemelli): quelle in più erano invisibili
+      const st = wStats(w), no = amt(st), step = Math.PI * 2 / no, R2 = st.radius * Player.areaMult;
+      if (w.special && w.special.fx === 'stelle') {
+        // STELLE DI COCITO: stelle di ghiaccio in alta risoluzione (le disegna present) + scia di brina
+        const PD0 = this.pd;
+        for (let k = 0; k < no && PD0.starN < 16; k++) {
+          const a = w.angle + k * step;
+          for (let q = 1; q <= 4; q++) {
+            const b = a - q * 0.09;
+            ctx.fillStyle = q < 3 ? PAL[']'] : PAL['{'];
+            ctx.fillRect(Math.round((camX + Math.cos(b) * R2) * S) + ox, Math.round((camY + Math.sin(b) * R2) * S) + oy, q < 2 ? 2 : 1, q < 2 ? 2 : 1);
+          }
+          PD0.sx[PD0.starN] = Math.round((camX + Math.cos(a) * R2) * S) + ox; PD0.sy[PD0.starN] = Math.round((camY + Math.sin(a) * R2) * S) + oy;
+          PD0.starN++;
+        }
+        PD0.starF = ((rt * 5) | 0) & 1;
+        continue;
+      }
+      for (let k = 0; k < no; k++) {
         const a = w.angle + k * step;
         if (w.evolved) { // scia
           ctx.fillStyle = PAL.s;
           const a2 = a - 0.25;
           ctx.fillRect(Math.round((camX + Math.cos(a2) * R2) * S) + ox, Math.round((camY + Math.sin(a2) * R2) * S) + oy, 2, 2);
         }
-        this.spr(os, os.img, camX + Math.cos(a) * R2, camY + Math.sin(a) * R2);
+        this.spr(os, w.evolved ? os.neon : os.img, camX + Math.cos(a) * R2, camY + Math.sin(a) * R2);
       }
     }
 
@@ -407,11 +547,12 @@ const Render = {
         for (let q = 9; q < Rb; q += 3) { const b = a - 0.1 - (q & 1) * 0.04; ctx.fillRect(ppx + Math.round(Math.cos(b) * q), ppy + Math.round(Math.sin(b) * q), 1, 1); }
         for (let q = 7; q <= Rb; q++) {
           const x = ppx + Math.round(ca * q), y = ppy + Math.round(sa * q);
-          ctx.fillStyle = PAL.L; ctx.fillRect(x + nx, y + ny, 1, 1); if (q & 1) ctx.fillRect(x - nx, y - ny, 1, 1);
-          ctx.fillStyle = q > Rb - 4 || w.evolved ? PAL.w : PAL[9]; ctx.fillRect(x, y, 1, 1);
+          if (w.evolved) { ctx.fillStyle = PAL['~']; ctx.fillRect(x + nx, y + ny, 1, 1); ctx.fillRect(x - nx, y - ny, 1, 1); }   // evoluta: bordi neon su tutti e due i lati
+          else { ctx.fillStyle = PAL.L; ctx.fillRect(x + nx, y + ny, 1, 1); if (q & 1) ctx.fillRect(x - nx, y - ny, 1, 1); }
+          ctx.fillStyle = w.evolved ? PAL[4] : q > Rb - 4 ? PAL.w : PAL[9]; ctx.fillRect(x, y, 1, 1);   // evoluta: nucleo scuro tra i due bordi neon
         }
         const tx = ppx + Math.round(ca * Rb), ty = ppy + Math.round(sa * Rb);
-        ctx.fillStyle = PAL.w; ctx.fillRect(tx - 1, ty, 3, 1); ctx.fillRect(tx, ty - 1, 1, 3);
+        ctx.fillStyle = w.evolved ? PAL['~'] : PAL.w; ctx.fillRect(tx - 1, ty, 3, 1); ctx.fillRect(tx, ty - 1, 1, 3);
       }
     }
 
@@ -422,11 +563,11 @@ const Render = {
       if (P.alive[i] === 0 || (kd !== PK.SALT && kd !== PK.ARROW)) continue;
       const x = P.px[i] * ia + P.x[i] * alpha, y = P.py[i] * ia + P.y[i] * alpha;
       if (x < L || x > R || y < T || y > B) continue;
-      const img = (kd === PK.SALT ? ss : ars).rot[P.rot[i]];
+      const img = kd === PK.SALT ? (P.evo[i] ? ss.neonRot : ss.rot)[P.rot[i]] : ars.rot[P.rot[i]];
       ctx.drawImage(img, Math.round(x * S) + ox - (img.width >> 1), Math.round(y * S) + oy - (img.height >> 1));
     }
     // falci di luna e asce (girano su se stesse) e fuochi fatui (con scia)
-    const sc = SPR.cache.proj_scythe, wsp = SPR.cache.wisp, axs = SPR.cache.proj_axe;
+    const sc = SPR.cache.proj_scythe, wsp = SPR.cache.wisp, wse = SPR.cache.wisp_evo, axs = SPR.cache.proj_axe;
     for (let i = 0; i < P.count; i++) {
       const kd = P.kind[i];
       if (P.alive[i] === 0 || (kd !== PK.SCYTHE && kd !== PK.WISP && kd !== PK.AXE)) continue;
@@ -435,14 +576,16 @@ const Render = {
       const sx = Math.round(x * S) + ox, sy = Math.round(y * S) + oy;
       if (kd === PK.SCYTHE || kd === PK.AXE) {
         const spin = kd === PK.AXE ? (P.vx[i] > 0 ? 18 : -18) : 24;
-        const img = (kd === PK.AXE ? axs : sc).rot[((((rt * spin) | 0) + i) % 16 + 16) & 15], sz = P.size[i];
+        const img = (kd === PK.AXE ? axs.rot : P.evo[i] ? sc.neonRot : sc.rot)[((((rt * spin) | 0) + i) % 16 + 16) & 15], sz = P.size[i];
         const w = Math.round(img.width * sz), h = Math.round(img.height * sz);
         ctx.drawImage(img, sx - (w >> 1), sy - (h >> 1), w, h);
       } else {
-        ctx.fillStyle = PAL.n;
-        const v = Math.sqrt(P.vx[i] * P.vx[i] + P.vy[i] * P.vy[i]) || 1;
-        ctx.fillRect(sx - Math.round(P.vx[i] / v * 4), sy - Math.round(P.vy[i] / v * 4), 2, 2);
-        ctx.drawImage(wsp.img, sx - (wsp.w >> 1), sy - (wsp.h >> 1) - (((rt * 10 + i) | 0) & 1));
+        // Linguae Ignis: scia di fumo nero e una scintilla gialla (bianca se evoluta) che sfarfalla
+        const v = Math.sqrt(P.vx[i] * P.vx[i] + P.vy[i] * P.vy[i]) || 1, ux = P.vx[i] / v, uy = P.vy[i] / v;
+        ctx.fillStyle = PAL[1]; ctx.fillRect(sx - Math.round(ux * 4), sy - Math.round(uy * 4), 2, 2);
+        if (((rt * 16 + i) | 0) & 1) { ctx.fillStyle = P.evo[i] ? PAL.w : PAL.Y; ctx.fillRect(sx - Math.round(ux * 7), sy - Math.round(uy * 7), 1, 1); }
+        const fs = P.evo[i] ? wse : wsp;
+        ctx.drawImage(fs.img, sx - (fs.w >> 1), sy - (fs.h >> 1) - (((rt * 10 + i) | 0) & 1));
       }
     }
     // Vite Aerea: scia dorata lungo la spirale (punteggiata) + elica a due pale che gira
@@ -465,7 +608,7 @@ const Render = {
       // elica: due pale con contorno nero, mozzo bianco
       const l = Math.max(3, Math.round(P.size[i] * S * 0.9)), spin = rt * 22 * dir + i;
       const bx = Math.cos(spin), by = Math.sin(spin) * 0.6;
-      ctx.fillStyle = PAL.k;
+      ctx.fillStyle = P.evo[i] ? PAL['~'] : PAL.k;   // evoluta: il contorno delle pale è neon
       for (let q = -l - 1; q <= l + 1; q++) ctx.fillRect(sx + Math.round(bx * q) - 1, sy + Math.round(by * q) - 1, 3, 3);
       for (let q = -l; q <= l; q++) {
         ctx.fillStyle = Math.abs(q) >= l - 1 ? PAL.w : (q > 0 ? PAL.L : PAL.K);
@@ -483,7 +626,9 @@ const Render = {
       const fade = Math.min(1, P.life[i] / 0.4, (P.life0[i] - P.life[i]) / 0.2);
       ctx.globalAlpha = 0.35 * fade; this.ditherDisk(sx, sy + Math.round(r * 0.35), Math.max(2, Math.round(r * 0.8)), this.pat(PAL.k));
       ctx.globalAlpha = fade;
-      const spin = rt * 9 + i;
+      const spin = rt * 9 + i, evo = P.evo[i];   // evoluta: bordo in cima e in fondo neon, il vortice resta scuro
+      const sw = P.src[i] >= 0 ? Player.weapons[P.src[i]] : null;
+      if (sw && sw.special && sw.special.fx === 'lucifero') { this.iceStorm(sx, sy, r, spin, fade, i, rt); ctx.globalAlpha = 1; continue; }
       for (let j = 0; j < 6; j++) {
         const f = j / 5, rx = r * (0.25 + 0.75 * f), ry = Math.max(1, rx * 0.3);
         const cy = sy + r * 0.35 - f * r * 1.4, cx = sx + Math.round(Math.sin(spin * 0.5 + j * 0.9) * (1 + f * 2));
@@ -491,7 +636,7 @@ const Render = {
         for (let q = 0; q < N; q++) {
           const a = q / N * 6.2832 + spin * (1 + f * 0.5), front = Math.sin(a) > 0;
           if (!front && (q & 1)) continue;
-          ctx.fillStyle = front ? (j > 3 ? PAL[9] : PAL[8]) : PAL[6];
+          ctx.fillStyle = evo ? (front && (j === 0 || j === 5) ? PAL['~'] : front ? PAL[7] : PAL[5]) : front ? (j > 3 ? PAL[9] : PAL[8]) : PAL[6];
           ctx.fillRect(cx + Math.round(Math.cos(a) * rx), Math.round(cy + Math.sin(a) * ry), 1, 1);
         }
       }
@@ -507,6 +652,15 @@ const Render = {
       const x = ES.px[i] * ia + ES.x[i] * alpha, y = ES.py[i] * ia + ES.y[i] * alpha;
       if (x < L || x > R || y < T || y > B) continue;
       if (ES.kind[i] === 2) continue; // pozze: disegnate sotto
+      if (ES.kind[i] === 4) {   // freccia dell'Arciere: alone rosso, scia, sprite grosso ruotato
+        const sx = Math.round(x * S) + ox, sy = Math.round(y * S) + oy, v = Math.sqrt(ES.vx[i] * ES.vx[i] + ES.vy[i] * ES.vy[i]) || 1;
+        const ux = ES.vx[i] / v, uy = ES.vy[i] / v;
+        ctx.globalAlpha = 0.5; this.ditherDisk(sx, sy, 8, this.pat(PAL.C)); ctx.globalAlpha = 1;
+        for (let q = 8; q <= 26; q += 2) { ctx.fillStyle = q < 16 ? PAL.D : PAL.B; ctx.fillRect(sx - Math.round(ux * q), sy - Math.round(uy * q), 1, 1); }
+        const img = SPR.cache.eb_arrow.rot[((Math.atan2(uy, ux) / 6.2832 * 16 + 16.5) | 0) & 15];
+        ctx.drawImage(img, sx - (img.width >> 1), sy - (img.height >> 1));
+        continue;
+      }
       const sp = ES.kind[i] === 1 ? eb : ES.kind[i] === 3 ? fb : gl1;
       this.spr(sp, sp.img, x, y);
     }
@@ -518,8 +672,9 @@ const Render = {
       const x = Math.round(FX.x[i] * S) + ox, y = Math.round(FX.y[i] * S) + oy;
       if (k === FXK.BOLT) {
         if (p > 0.6 && (((rt * 30) | 0) & 1)) continue; // sfarfallio finale
-        this.bolt(Math.round(FX.x2[i] * S) + ox, Math.round(FX.y2[i] * S) + oy, x, y, FX.seed[i]);
-        if (p < 0.5) { ctx.globalAlpha = 0.6; this.ditherDisk(x, y, Math.round(FX.r[i] * S), this.pat(PAL.n)); ctx.globalAlpha = 1; }
+        const bs = FX.val[i];
+        this.bolt(Math.round(FX.x2[i] * S) + ox, Math.round(FX.y2[i] * S) + oy, x, y, FX.seed[i], FX.evo[i], bs, p);
+        if (p < 0.5) { ctx.globalAlpha = 0.6; this.ditherDisk(x, y, Math.round(FX.r[i] * S), this.pat(bs === 1 ? PAL[1] : bs === 2 ? PAL.K : PAL.n)); ctx.globalAlpha = 1; }
       } else if (k === FXK.SLASH) {
         // fendente del Pugio: la lama gira attorno a te (con due copie sbiadite) e lascia una mezzaluna tagliente.
         // I colpi alternano il verso; il terzo della combo è più largo, con doppia scia e lampo sulla punta.
@@ -580,8 +735,10 @@ const Render = {
         for (let q = 4; q <= len; q++) {
           if (p > 0.6 && ((q + ((rt * 30) | 0)) & 1)) continue;
           const f = q / Math.max(1, R);
-          ctx.fillStyle = q > len - 3 ? PAL.w : f < 0.22 ? PAL.h : p < 0.4 ? PAL[8] : PAL[6];
-          ctx.fillRect(px0 + side * q, py0 + wave(q), 1, f < 0.5 ? 2 : 1);
+          const th = f < 0.5 ? 2 : 1, wy = py0 + wave(q);
+          if (FX.evo[i]) { ctx.fillStyle = PAL['~']; ctx.fillRect(px0 + side * q, wy - 1, 1, 1); ctx.fillRect(px0 + side * q, wy + th, 1, 1); }   // evoluta: contorno neon
+          ctx.fillStyle = q > len - 3 ? (FX.evo[i] ? PAL['~'] : PAL.w) : f < 0.22 ? PAL.h : FX.evo[i] ? PAL[5] : p < 0.4 ? PAL[8] : PAL[6];
+          ctx.fillRect(px0 + side * q, wy, 1, th);
         }
         if (p > 0.3 && p < 0.6) {
           const tx = px0 + side * len, ty = py0 + wave(len);
@@ -594,7 +751,7 @@ const Render = {
         const px0 = Math.round(Player.x * S) + ox, py0 = Math.round(Player.y * S) + oy;
         if (p < 0.6) { ctx.globalAlpha = 0.3 * (1 - p / 0.6); this.ditherDisk(px0, py0, r, this.pat(PAL['{'])); }
         ctx.globalAlpha = 1 - p * 0.7;
-        this.circle(px0, py0, r, PAL[']']);
+        this.circle(px0, py0, r, FX.evo[i] ? PAL['~'] : PAL[']']);
         if (r > 3) this.circle(px0, py0, r - 1, PAL['{']);
         ctx.fillStyle = PAL.w;
         for (let q = 0; q < 12; q++) { const a = q * 0.5236 + FX.seed[i]; ctx.fillRect(px0 + Math.round(Math.cos(a) * r), py0 + Math.round(Math.sin(a) * r), 2, 2); }
@@ -641,10 +798,28 @@ const Render = {
       } else if (k === FXK.NUM) {
         if (p > 0.75 && (((rt * 24) | 0) & 1)) continue;
         this.number(x, y - Math.round(p * 10), FX.val[i], FX.r[i] === 1);
+      } else if (k === FXK.GLINT) {
+        // impatto degli Strali di Giove: anello d'oro che si allarga + stella a 8 raggi + lampo bianco
+        const r = Math.max(2, Math.round(FX.r[i] * S * (0.35 + 0.9 * p))), rr = Math.round(r * (1.4 - p * 0.6));
+        if (p < 0.3) { ctx.globalAlpha = 0.5; this.ditherDisk(x, y, Math.round(r * 0.8), this.pat(PAL.Z)); ctx.globalAlpha = 1; }
+        this.circle(x, y, r, p < 0.5 ? PAL.L : PAL.K);
+        if (p < 0.7) {
+          ctx.fillStyle = p < 0.35 ? PAL.w : PAL.Z;
+          ctx.fillRect(x - rr, y, rr * 2 + 1, 1); ctx.fillRect(x, y - rr, 1, rr * 2 + 1);
+          const d = Math.round(rr * 0.55);
+          for (let q = 1; q <= d; q += 2) { ctx.fillRect(x + q, y + q, 1, 1); ctx.fillRect(x - q, y - q, 1, 1); ctx.fillRect(x + q, y - q, 1, 1); ctx.fillRect(x - q, y + q, 1, 1); }
+        }
+        if (p < 0.2) { ctx.fillStyle = PAL.w; ctx.fillRect(x - 1, y - 1, 3, 3); }
+      } else if (k === FXK.FLARE) {
+        // scoppio di Linguae Ignis: fumo nero, anello giallo, lampo bianco al centro
+        const r = Math.max(1, Math.round(FX.r[i] * S * (0.45 + 0.55 * p)));
+        if (p < 0.55) { ctx.globalAlpha = 0.75; this.ditherDisk(x, y, r, this.pat(PAL[1])); ctx.globalAlpha = 1; }
+        this.circle(x, y, r, p < 0.6 ? PAL.Y : PAL[3]);
+        if (p < 0.4) this.circle(x, y, Math.max(1, (r * 0.45) | 0), PAL.w);
       } else if (k === FXK.BOOM) {
         const r = Math.max(1, Math.round(FX.r[i] * S * (0.4 + 0.6 * p)));
         if (p < 0.35) { ctx.globalAlpha = 0.85; this.ditherDisk(x, y, r, this.pat(PAL.F)); ctx.globalAlpha = 1; }
-        this.circle(x, y, r, p < 0.5 ? PAL.P : PAL.F);
+        this.circle(x, y, r, FX.evo[i] ? PAL['~'] : p < 0.5 ? PAL.P : PAL.F);
         if (p < 0.7) this.circle(x, y, Math.max(1, (r * 0.6) | 0), PAL.G);
       }
     }
@@ -696,6 +871,8 @@ const Render = {
         if (Gm.alive[i] === 0 || Gm.kind[i] !== GK.CHEST) continue;
         if (this.pointer(Math.round(Gm.x[i] * S) + ox, Math.round(Gm.y[i] * S) + oy, PAL.O, PAL.Y, rt, 0)) shown++;
       }
+      // il Magister: freccia dorata, da quando hai visto la sua lanterna
+      if (Camp.seen && G.mapId === MAGISTER_CAMP.map) this.pointer(Math.round(MAGISTER_CAMP.x * S) + ox, Math.round(MAGISTER_CAMP.y * S) + oy, PAL.K, PAL.Z, rt, 0);
     }
 
     // vita bassa: bordi rossi che pulsano
@@ -733,7 +910,7 @@ const Render = {
   },
 
   // ---- alta risoluzione ----------------------------------------------------------
-  pd: { n: 0, e: null, img: null, x: 0, y: 0, trail: 0, tx: new Float32Array(8), ty: new Float32Array(8), ta: new Float32Array(8), tf: new Int8Array(8) },
+  pd: { n: 0, e: null, img: null, x: 0, y: 0, npc: null, starN: 0, starF: 0, sx: new Float32Array(16), sy: new Float32Array(16), trail: 0, tx: new Float32Array(8), ty: new Float32Array(8), ta: new Float32Array(8), tf: new Int8Array(8) },
   // disegna uno sprite sul canvas visibile: (x,y) = centro in pixel del gioco; k = ingrandimento extra (villaggio)
   hiSprite(e, img, x, y, k) {
     const h = this.hctx, sc = (e.hi ? 1 : 2) * (k || 1);
@@ -750,6 +927,8 @@ const Render = {
     if (G.scene === 'village') { Village.present(); return; }
     const PD = this.pd, e = PD.e;
     if (!e) return;
+    if (PD.npc) this.hiSprite(PD.npc.e, PD.npc.img, PD.npc.x, PD.npc.y);
+    if (PD.starN) { const st = SPR.cache[PD.starF ? 'star_ice2' : 'star_ice']; for (let k = 0; k < PD.starN; k++) this.hiSprite(st, st.img, PD.sx[k], PD.sy[k]); }
     for (let k = 0; k < PD.trail; k++) {
       h.globalAlpha = PD.ta[k];
       this.hiSprite(e, PD.tf[k] < 0 ? (e.dashMir || e.mir) : (e.dashImg || e.img), PD.tx[k], PD.ty[k]);
@@ -833,7 +1012,10 @@ const Render = {
   },
 
   // fulmine a zig-zag deterministico (stesso seed = stessa forma per tutta la durata)
-  bolt(x0, y0, x1, y1, seed) {
+  // style: 0 normale | 1 Fulmini di Capaneo (bordo nero spesso, corpo giallo, cuore bianco, scintille)
+  //        2 Strali di Giove (oro: alone largo, cuore bianco, rami laterali) — vedi BOLT_STYLE
+  bolt(x0, y0, x1, y1, seed, evo, style, p) {
+    if (style) { this.boltFancy(x0, y0, x1, y1, seed, style, p || 0); return; }
     const ctx = this.ctx, N = 7;
     let px = x0, py = y0;
     const nx = -(y1 - y0), ny = x1 - x0, nl = Math.sqrt(nx * nx + ny * ny) || 1;
@@ -845,9 +1027,38 @@ const Render = {
         jx += nx / nl * j; jy += ny / nl * j;
       }
       jx = Math.round(jx); jy = Math.round(jy);
-      ctx.fillStyle = PAL.o; this.line(px + 1, py, jx + 1, jy);
-      ctx.fillStyle = PAL[9]; this.line(px, py, jx, jy);
+      if (evo) { ctx.fillStyle = PAL['~']; this.line(px - 1, py, jx - 1, jy); this.line(px + 1, py, jx + 1, jy); }
+      else { ctx.fillStyle = PAL.o; this.line(px + 1, py, jx + 1, jy); }
+      ctx.fillStyle = evo ? PAL[8] : PAL[9]; this.line(px, py, jx, jy);
       px = jx; py = jy;
+    }
+  },
+  boltFancy(x0, y0, x1, y1, seed, style, p) {
+    const ctx = this.ctx, gold = style === 2, N = gold ? 10 : 7, amp = gold ? 9 : 6;
+    const nx = -(y1 - y0), ny = x1 - x0, nl = Math.sqrt(nx * nx + ny * ny) || 1, ux = nx / nl, uy = ny / nl;
+    const P = this._boltPts || (this._boltPts = new Float32Array(32));
+    P[0] = x0; P[1] = y0;
+    for (let k = 1; k <= N; k++) {
+      const f = k / N, j = k < N ? (((seed * 7919 + k * 104729 + ((p * 3) | 0) * 31) % (amp * 2 + 1)) - amp) : 0;   // tremola un po' mentre vive
+      P[k * 2] = Math.round(x0 + (x1 - x0) * f + ux * j); P[k * 2 + 1] = Math.round(y0 + (y1 - y0) * f + uy * j);
+    }
+    // 3 passate: alone/bordo, corpo, cuore
+    const outer = gold ? PAL.K : PAL[1], mid = gold ? PAL.L : PAL.Y, core = p > 0.6 ? (gold ? PAL.Z : PAL.Z) : PAL.w;
+    for (let pass = 0; pass < 3; pass++) {
+      ctx.fillStyle = pass === 0 ? outer : pass === 1 ? mid : core;
+      const off = pass === 0 ? 1 : 0;
+      for (let k = 1; k <= N; k++) {
+        const ax = P[k * 2 - 2], ay = P[k * 2 - 1], bx = P[k * 2], by = P[k * 2 + 1];
+        if (pass === 0) { this.line(ax - 1, ay, bx - 1, by); this.line(ax + 1, ay, bx + 1, by); this.line(ax, ay - 1, bx, by - 1); if (gold) this.line(ax + 2, ay, bx + 2, by); }
+        else if (pass === 1) { this.line(ax, ay, bx, by); this.line(ax + 1, ay, bx + 1, by); }
+        else if (off === 0) this.line(ax, ay, bx, by);
+      }
+    }
+    // rami laterali (Giove) e scintille (Capaneo)
+    for (let k = 2; k < N; k += 2) {
+      const bx = P[k * 2], by = P[k * 2 + 1], s = ((seed + k * 13) % 2) ? 1 : -1, l = gold ? 7 : 4;
+      if (gold) { ctx.fillStyle = PAL.L; this.line(bx, by, bx + Math.round(ux * l * s + (x1 - x0) / nl * 2), by + Math.round(uy * l * s + 3)); }
+      else if (((seed + k) & 1) === 0) { ctx.fillStyle = PAL.Y; ctx.fillRect(bx + s * 2, by - 1, 1, 1); ctx.fillStyle = PAL.w; ctx.fillRect(bx - s * 2, by + 1, 1, 1); }
     }
   },
 };

@@ -47,13 +47,19 @@ const ELITE = {
 // NOTTE — dopo il minuto 6: ogni 60 s, 40 di giorno e 20 di notte
 const NIGHT = {
   start: 360, cycle: 60, nightLen: 20,
-  lightR: 140,            // raggio (unità di mondo) della luce attorno al personaggio
+  lightR: 150,            // raggio (unità di mondo) della luce attorno al personaggio
+  dark: 0.9,              // quanto è scuro il mondo fuori dalla luce (0..1)
+  fade: 2.5,              // secondi del crepuscolo / dell'alba
   speedMult: 1.25,        // di notte gli slime corrono di più
   dmgMult: 1.3,           // e mordono più forte
 };
 
 // VITTORIA — si vince resistendo fino al minuto 7. Poi si può continuare (modalità infinita).
 const WIN = { time: 420, warnAt: 405, reward: { coins: 5 } };   // monete x moltiplicatore difficoltà (bonus vittoria)
+
+// SUBITO DOPO LA VITTORIA (se continui): i due guardiani della mappa (b2 + b3) arrivano INSIEME.
+// delay = secondi dal "Continua" all'arrivo, warnBefore = avviso quanti secondi prima
+const DUO = { delay: 9, warnBefore: 5 };
 
 // MINUTO 10 (solo se continui): i tre boss della mappa arrivano INSIEME e gli slime diventano più forti
 const TRIO = { time: 600, warnAt: 590 };
@@ -87,8 +93,15 @@ const BOSS3 = {
 // Breve corsa velocissima e invulnerabile. Eek alla fine lancia un ventaglio di kunai.
 const DASH = { cd: 3.5, cdEek: 2.8, time: 0.16, speed: 950, iframes: 0.32, kunai: 5, kunaiDmg: 16, spread: 0.22 };
 
-// SPUTACCHINO — sputa palle di melma
-const SPIT = { range: 300, cd: 2.4, speed: 150, keepAway: 170 };
+// TELETRASPORTO — abilità segreta (resisti fino all'11:00 nella Palude, vedi UNLOCKS): tasto E/Q (PC) o il tasto TELE (telefono).
+// Sparisci e ricompari `dist` più in là (circa 6 passi) nella direzione in cui vai, scavalcando chi ti sta davanti.
+const TELEPORT = { cd: 4.5, dist: 175, iframes: 0.35, ghosts: 5 };
+
+// ARCIERE (Iracundus, ex Sputacchino) — pochi, ma pericolosi: si ferma, tende l'arco (linea di mira che ti segue,
+// poi si blocca e diventa bianca) e scocca UNA freccia grossa e veloce che toglie tanta vita. Le colonne fanno da riparo.
+//   share = quota tra gli slime normali (x G.map.spitter) | cd = tempo tra un tiro e l'altro | tell = quanto tende l'arco
+//   lock = ultimi secondi del tell con la mira bloccata | dmgMult = danno della freccia rispetto al morso dell'arciere
+const SPIT = { share: 0.05, range: 340, cd: 5.0, tell: 0.9, lock: 0.3, speed: 330, life: 2.4, keepAway: 190, dmgMult: 2.8 };
 
 // FORZIERI — li lasciano i Cacciatori (a volte) e i boss (sempre): 1 o 3 potenziamenti
 const CHEST = { eliteChance: 0.45, three: 0.3 };

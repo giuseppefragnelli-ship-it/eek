@@ -29,6 +29,9 @@ const Save = {
       chars: ['eek'],       // personaggi sbloccati
       char: 'eek',          // personaggio scelto
       stones: 0,            // Pietre del Fabbro
+      arcana: 0,            // Arcanum [?] del Magister (fusioni d'arma da usare)
+      unlocks: {},          // sblocchi segreti (UNLOCKS): id -> true
+      fusions: {},          // fusioni uniche già scoperte (FUSION_SPECIAL): chiave -> true
       wins: {},             // mappe vinte: id -> true
       map: 'cripta',        // mappa scelta
       savedAt: 0,           // ms dell'ultimo salvataggio (per scegliere il più recente tra telefono e PC)
@@ -60,6 +63,9 @@ const Save = {
     d.items = d.items || {}; d.wins = d.wins || {}; d.quests = d.quests || {}; d.records = d.records || {}; d.tips = d.tips || {};
     for (const id in d.items) if (!SHOP_ITEMS[id]) delete d.items[id];
     d.mastery = d.mastery || {}; d.omens = d.omens || {};
+    d.unlocks = d.unlocks && typeof d.unlocks === 'object' ? d.unlocks : {};
+    d.fusions = d.fusions && typeof d.fusions === 'object' ? d.fusions : {};
+    d.arcana = Math.max(0, Math.min(ARCANUM.max, d.arcana | 0));
     for (const id in d.mastery) if (!PASSIVE_DEFS[id]) delete d.mastery[id];
     for (const id in d.omens) if (!SHOP_ITEMS[id] || !Array.isArray(d.omens[id])) delete d.omens[id];
     if (!SHOP_ITEMS[d.gear] || !SHOP_ITEMS[d.gear].gear) d.gear = 'dagger';
@@ -222,6 +228,24 @@ const Save = {
     this.data.mastery[id] = this.masteryRank(id) + 1;
     this.write();
     return true;
+  },
+
+  // Arcanum [?]: si compra dal Magister, si consuma fondendo due armi in partita
+  buyArcanum() {
+    if ((this.data.arcana || 0) >= ARCANUM.max || !this.spend(ARCANUM.price)) return false;
+    this.data.arcana = (this.data.arcana || 0) + 1;
+    this.write();
+    return true;
+  },
+
+  // ---- sblocchi segreti (UNLOCKS) ----------------------------------------------
+  unlocked(id) { return !!(this.data && this.data.unlocks[id]); },
+  // difficoltà con cui si gioca una mappa: Facile solo dove vale (DIFFICULTY.facile.map) e solo se sbloccata
+  diffFor(mapId) {
+    const id = this.data.difficulty, D = DIFFICULTY[id];
+    if (!D) return DEFAULT_DIFFICULTY;
+    if (D.map) return D.map === mapId && this.unlocked(D.unlock) ? id : DEFAULT_DIFFICULTY;
+    return id;
   },
 
   // ---- Aruspice --------------------------------------------------------------

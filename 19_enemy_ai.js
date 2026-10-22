@@ -13,6 +13,9 @@ function updateNight() {
     if (night) { UI.toast('Nox', '"Lo giorno se n\'andava, e l\'aere bruno..."', 4); Sfx.play('night'); }
     else UI.toast('Aurora', '"Dolce color d\'orïental zaffiro."', 3);
   }
+  // il buio arriva e se ne va in NIGHT.fade secondi (lo usa solo il disegno)
+  const k = CFG.DT / NIGHT.fade;
+  G.nightK = night ? Math.min(1, G.nightK + k) : Math.max(0, G.nightK - k);
 }
 
 // Debug: evoca subito il prossimo boss (B): Flegiàs, poi il trio del minuto 10
@@ -82,17 +85,35 @@ function updateEnemies(dt) {
       }
     }
 
-    // Sputacchino (palle di melma) e Furia (ventaglio di 3 fiammate): tengono le distanze e sparano
-    else if (E.type[i] === SPITTER_T || E.type[i] === FURIA_T) {
-      const C = E.type[i] === SPITTER_T ? SPIT : FURIA;
+    // Arciere: tiene le distanze, poi si ferma e tende l'arco (aiS = 1, mira in ddx/ddy: segue te, poi si blocca)
+    // e scocca una freccia sola, grossa e letale. Il disegno mostra la linea di mira (Render.draw).
+    else if (E.type[i] === SPITTER_T) {
+      E.aiT[i] -= dt;
+      if (E.aiS[i] === 1) {
+        vx = vy = 0;
+        if (E.aiT[i] > SPIT.lock) { E.ddx[i] = dx / d; E.ddy[i] = dy / d; }
+        if (E.aiT[i] <= 0) {
+          E.aiS[i] = 0; E.aiT[i] = SPIT.cd * (0.8 + Math.random() * 0.4);
+          spawnEShot(4, X[i], Y[i], E.ddx[i], E.ddy[i], SPIT.speed, E.dmg[i] * SPIT.dmgMult * (G.night ? NIGHT.dmgMult : 1));
+          if (d < nearX) Sfx.play('spit');
+        }
+      } else {
+        if (d < SPIT.keepAway) { vx = -vx * 0.6; vy = -vy * 0.6; }
+        else if (d < SPIT.range * 0.85) { vx *= 0.15; vy *= 0.15; }
+        if (E.aiT[i] <= 0 && d < SPIT.range) { E.aiS[i] = 1; E.aiT[i] = SPIT.tell; E.ddx[i] = dx / d; E.ddy[i] = dy / d; }
+      }
+    }
+
+    // Furia (ventaglio di 3 fiammate): tiene le distanze e spara
+    else if (E.type[i] === FURIA_T) {
+      const C = FURIA;
       if (d < C.keepAway) { vx = -vx * 0.6; vy = -vy * 0.6; }
       else if (d < C.range * 0.85) { vx *= 0.15; vy *= 0.15; }
       E.aiT[i] -= dt;
       if (E.aiT[i] <= 0 && d < C.range) {
         E.aiT[i] = C.cd * (0.8 + Math.random() * 0.4);
         const dm = E.dmg[i] * (G.night ? NIGHT.dmgMult : 1), ux = dx / d, uy = dy / d;
-        if (C === SPIT) spawnEShot(0, X[i], Y[i], ux, uy, C.speed, dm);
-        else for (let k = -1; k <= 1; k++) {
+        for (let k = -1; k <= 1; k++) {
           const a = k * C.spread, ca = Math.cos(a), sa = Math.sin(a);
           spawnEShot(3, X[i], Y[i], ux * ca - uy * sa, ux * sa + uy * ca, C.speed, dm);
         }
@@ -157,7 +178,8 @@ function updateEnemies(dt) {
 
 // ---------------------------------------------------------------------------
 // PROIETTILI DEI NEMICI
-// kind 0 = palla di melma (Sputacchino), 1 = proiettile del boss finale
+// kind 0 = palla di melma (non più usata dagli arcieri), 1 = proiettile del guardiano maggiore,
+// 2 = pozza di veleno, 3 = fiammata della Furia, 4 = freccia dell'Arciere (grossa, veloce, fa male)
 // ---------------------------------------------------------------------------
 function bossShotDmg() { return BOSS3.bulletDmg * CFG.enemyDmgMult(G.time) * G.diff.dmg * G.map.dmg; }
 
@@ -168,7 +190,7 @@ function spawnEShot(kind, x, y, dx, dy, speed, dmg) {
   S.alive[i] = 1; S.kind[i] = kind;
   S.x[i] = S.px[i] = x; S.y[i] = S.py[i] = y;
   S.vx[i] = dx * speed; S.vy[i] = dy * speed;
-  S.life[i] = kind === 1 ? 6 : 3.2; S.dmg[i] = dmg; S.r[i] = kind === 1 ? 7 : 6;
+  S.life[i] = kind === 1 ? 6 : kind === 4 ? SPIT.life : 3.2; S.dmg[i] = dmg; S.r[i] = kind === 1 || kind === 4 ? 7 : 6;
 }
 
 // pozza di veleno (ferma, fa male finché ci stai sopra; i colpi arrivano a intervalli grazie all'invulnerabilità)

@@ -4,6 +4,7 @@
 // ============================================================================
 // VILLAGGIO — scena tra una partita e l'altra. Ci cammini col joystick
 // (o WASD), ti avvicini a un abitante e parli con lui:
+//   Magister    -> non c'è più: sulla porta un biglietto (è nella Cattedrale, vedi Camp in fondo)
 //   Fabbro      -> rafforza gli oggetti
 //   Armaiolo    -> armi
 //   Corazzaio   -> armature e gioielli
@@ -22,7 +23,8 @@ const Village = {
   W: 1500, H: 820,                   // dimensioni del villaggio
   houseY: -170,                      // linea dei piedi delle case (porte)
   npcs: [
-    { id: 'magister', name: 'il Magister',  x: -625, house: 'h_magister', sprite: 'npc_magister', sign: 'ico_book' },
+    // il Magister è sceso nella Cattedrale (MAGISTER_CAMP): resta la casa con un biglietto sulla porta
+    { id: 'magister', name: 'il biglietto del Magister', verb: 'Leggi', away: true, x: -625, house: 'h_magister', sprite: 'npc_magister', sign: 'ico_book' },
     { id: 'smith',   name: 'il Fabbro',     x: -375, house: 'h_smith',   sprite: 'npc_smith',   sign: 'ico_anvil', extra: 'v_anvil' },
     { id: 'weapons', name: "l'Armaiolo",    x: -125, house: 'h_weapons', sprite: 'npc_weapons', sign: 'it_dagger', extra: 'v_rack' },
     { id: 'armor',   name: 'il Corazzaio',  x: 125,  house: 'h_armor',   sprite: 'npc_armor',   sign: 'it_shield' },
@@ -51,7 +53,9 @@ const Village = {
       n.y = this.houseY + 22;
       n.x0 = n.x; n.x = n.x + 40;                          // l'abitante sta accanto alla porta
       add(n.house, n.x0, this.houseY, { house: n });
-      box(n.x0 - 56, this.houseY - 100, n.x0 + 56, this.houseY - 4);
+      const hw = ((SPR.cache[n.house].w >> 1) - 3) / this.VS;    // le case hanno larghezze diverse
+      box(n.x0 - hw, this.houseY - 100, n.x0 + hw, this.houseY - 4);
+      if (n.away) continue;                                // non c'è nessuno: solo il biglietto sulla porta
       add(n.sprite, n.x, n.y + 14, { npc: n });
       CI.push([n.x, n.y, 10]);
       if (n.extra) { const ex = n.x0 - 44, ey = this.houseY + 26; add(n.extra, ex, ey); CI.push([ex, ey - 6, 12]); }
@@ -145,7 +149,7 @@ const Village = {
 
   talk() {
     if (!this.near) return;
-    UI.openShop(this.near.id, 'village');
+    UI.openShop(this.near.away ? this.near.id + '_away' : this.near.id, 'village');
   },
 
   draw(alpha) {
@@ -237,14 +241,22 @@ const Village = {
         ctx.drawImage(s.img, sx - (s.w >> 1), sy - s.h);
       }
       if (o.house) {
-        // insegna appesa accanto alla porta + fumo dal comignolo
+        // alone delle lanterne, insegna di legno con l'icona del mestiere, fumo (solo dove c'è uno sfiato)
+        // posizioni dentro lo sprite: s.lamps, s.sign = [x, y, su un palo], s.smoke (vedi SPR.initVillage)
         const n = o.house, hx = sx - (s.w >> 1), hy = sy - s.h, sg = SPR.cache[n.sign];
-        ctx.fillStyle = PAL.g; ctx.fillRect(hx + 37, hy + 42, 1, 3); ctx.fillRect(hx + 37, hy + 42, 11, 1);
-        ctx.fillStyle = PAL[2]; ctx.fillRect(hx + 38, hy + 45, 11, 10); ctx.fillStyle = PAL[5]; ctx.fillRect(hx + 38, hy + 45, 11, 1);
-        ctx.drawImage(sg.img, hx + 43 - (sg.w >> 1), hy + 50 - (sg.h >> 1));
-        for (let k = 0; k < 4; k++) {
+        for (const L of s.lamps) {
+          ctx.globalAlpha = 0.14 + 0.05 * Math.sin(rt * 3 + L[0] + n.x0); R.ditherDisk(hx + L[0], hy + L[1], 7, R.pat(PAL.G)); ctx.globalAlpha = 1;
+        }
+        const qx = hx + s.sign[0] - 5, qy = hy + s.sign[1] - 5;
+        ctx.fillStyle = PAL.g;
+        if (s.sign[2]) ctx.fillRect(qx + 5, qy + 10, 1, sy - qy - 10);             // palo fino a terra
+        else { ctx.fillRect(qx + 2, qy - 2, 1, 2); ctx.fillRect(qx + 8, qy - 2, 1, 2); }   // cordini
+        ctx.fillStyle = PAL.f; ctx.fillRect(qx - 1, qy - 1, 13, 12);
+        ctx.fillStyle = PAL[2]; ctx.fillRect(qx, qy, 11, 10); ctx.fillStyle = PAL[5]; ctx.fillRect(qx, qy, 11, 1);
+        ctx.drawImage(sg.img, qx + 5 - (sg.w >> 1), qy + 5 - (sg.h >> 1));
+        if (s.smoke) for (let k = 0; k < 4; k++) {
           const p = ((rt * 0.35 + k / 4 + n.x0 * 0.01) % 1);
-          const fx = hx + 44 + Math.round(Math.sin(p * 6 + k) * 2 + p * 6), fy = hy - Math.round(p * 18);
+          const fx = hx + s.smoke[0] + Math.round(Math.sin(p * 6 + k) * 2 + p * 6), fy = hy + s.smoke[1] - Math.round(p * 18);
           ctx.globalAlpha = 0.45 * (1 - p); R.ditherDisk(fx, fy, 1 + Math.round(p * 3), R.pat(n.id === 'smith' ? PAL.F : PAL[5])); ctx.globalAlpha = 1;
         }
       }
@@ -256,5 +268,73 @@ const Village = {
         ctx.fillStyle = this.near === n ? PAL.w : PAL.Y; ctx.fillRect(sx - 1, top, 3, 5); ctx.fillRect(sx - 1, top + 6, 3, 2);
       }
     }
+  },
+};
+
+// ============================================================================
+// IL MAGISTER NELLA CATTEDRALE — un piccolo accampamento tra le rovine (MAGISTER_CAMP in 05_data_maps.js):
+// tappeto, libri, una lanterna e il Magister. Ci arrivi camminando verso destra (circa un minuto);
+// quando sei vicino appare "Parla con il Magister" (o Invio / E) e si apre la sua Schola, a partita ferma.
+// ============================================================================
+const Camp = {
+  near: false, seen: false,
+  _hd: { e: null, img: null, x: 0, y: 0 },
+
+  here() { return G.scene === 'run' && G.mapId === MAGISTER_CAMP.map; },
+  reset() { this.near = false; this.seen = false; },
+
+  // ogni step: sei abbastanza vicino per parlarci? (e la prima volta che ti avvicini, un avviso)
+  update() {
+    if (G.mapId !== MAGISTER_CAMP.map) return;
+    const C = MAGISTER_CAMP, dx = Player.x - C.x, dy = Player.y - C.y, d2 = dx * dx + dy * dy;
+    const near = d2 < C.talkR * C.talkR;
+    if (near !== this.near) { this.near = near; UI.runPrompt(near); }
+    if (!this.seen && d2 < C.hintR * C.hintR) { this.seen = true; UI.toast(G.map.name, 'Una lanterna brilla tra le rovine, più a destra...', 5); }
+  },
+
+  talk() {
+    if (!this.near || G.state !== 'play') return;
+    UI.openShop('magister', 'run');
+  },
+
+  _vis(S, ox, oy) {   // l'accampamento è (quasi) in vista?
+    const C = MAGISTER_CAMP, x = Math.round(C.x * S) + ox, y = Math.round(C.y * S) + oy;
+    return x > -80 && x < Render.W + 80 && y > -80 && y < Render.H + 80;
+  },
+
+  // per terra (sotto ai dannati, di notte nel buio): tappeto rosso, pila di libri, barile
+  drawGround(ctx, S, ox, oy, rt) {
+    if (!this._vis(S, ox, oy)) return;
+    const C = MAGISTER_CAMP, x = Math.round(C.x * S) + ox, y = Math.round(C.y * S) + oy;
+    // il Magister sta in piedi in mezzo al tappeto
+    ctx.fillStyle = PAL.k; ctx.fillRect(x - 19, y - 7, 38, 13);
+    ctx.fillStyle = PAL.B; ctx.fillRect(x - 18, y - 6, 36, 11);
+    ctx.fillStyle = PAL.C; ctx.fillRect(x - 16, y - 4, 32, 7);
+    ctx.fillStyle = PAL.K; for (let q = -14; q <= 14; q += 4) { ctx.fillRect(x + q, y - 6, 1, 1); ctx.fillRect(x + q, y + 4, 1, 1); }
+    const br = SPR.cache.v_barrel, bk = SPR.cache.ico_book;
+    if (br) ctx.drawImage(br.img, x + 24 - (br.w >> 1), y + 6 - br.h);
+    if (bk) { ctx.drawImage(bk.img, x - 30 - (bk.w >> 1), y + 6 - bk.h); ctx.drawImage(bk.img, x - 29 - (bk.w >> 1), y + 1 - bk.h); }
+  },
+
+  // la lanterna e il suo alone (sopra al velo della notte: di notte l'accampamento si vede da lontano)
+  drawLit(ctx, S, ox, oy, rt) {
+    if (!this._vis(S, ox, oy)) return;
+    const C = MAGISTER_CAMP, x = Math.round(C.x * S) + ox, y = Math.round(C.y * S) + oy, lx = x - 16, ly = y - 4;
+    ctx.globalAlpha = 0.16 + 0.05 * Math.sin(rt * 3) + 0.16 * G.nightK;   // di notte l'alone si allarga: un faro tra le rovine
+    Render.ditherDisk(lx, ly - 10, 26 + Math.round(20 * G.nightK), Render.pat(PAL.G));
+    ctx.globalAlpha = 1;
+    const ln = SPR.cache.lantern;
+    if (ln) ctx.drawImage(ln.img, lx - (ln.w >> 1), ly - ln.h + 4);
+  },
+
+  // il Magister in alta risoluzione (lo disegna Render.present): respira e si gira verso di te
+  hd(S, ox, oy, rt) {
+    if (!this._vis(S, ox, oy)) return null;
+    const C = MAGISTER_CAMP, br = ((rt * 1.3) | 0) & 1, e = SPR.cache[br ? 'npc_magister_b' : 'npc_magister'] || SPR.cache.npc_magister;
+    if (!e) return null;
+    const H = this._hd, face = Player.x < C.x;
+    H.e = e; H.img = face ? e.mir : e.img;
+    H.x = Math.round(C.x * S) + ox; H.y = Math.round(C.y * S) + oy - (e.hi ? e.h / 4 : e.h / 2);
+    return H;
   },
 };
