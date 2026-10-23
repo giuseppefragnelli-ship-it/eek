@@ -26,12 +26,14 @@ function startRun() {
   Enemies.clear(); Projectiles.clear(); Gems.clear(); FX.clear(); EShots.clear(); Zones.clear();
   Obs.n = 0;
   G.time = 0; G.kills = 0; G.nextUid = 1; G.runCoins = 0; G.runBonus = 0;
-  G.pendingLevels = 0; G.rerolls = REROLL.perRun; G.slowFactor = 1; G.shake = 0; G.mergeT = 1; G.flash = 0; G.night = false; G.nightK = 0;
+  G.pendingLevels = 0; G.rerolls = REROLL.perRun; G.slowFactor = 1; G.shake = 0; G.mergeT = 1; G.flash = 0; G.night = false; G.nightK = 0; G.eternal = false;
+  G.reefT = 0; G.reefDone = false; G.reefWarned = false; G.killedBy = null;
   G.victory = false; G.victoryT = 0; G.src = null;
   G.won = false; G.endless = false; G.hitStop = 0; G.lvlT = 0; G.dyingT = 0;
   G.chestQueue.length = 0; G.chestSeen = false;
   G.rs = { elites: 0, chests: 0, evos: 0, bosses: {} };
   G.paidMin = 0; G.killsC = 0; G.committed = false;
+  G.cheat = G.god;   // trucchi del debug usati (anche l'invincibilità rimasta accesa): la partita non conta
   G.scene = 'run';
   nextUnlockTime();
   Camp.reset();
@@ -43,7 +45,7 @@ function startRun() {
   acc = 0;
   setState('play');
   Sfx.play('portal');
-  UI.toast(G.map.name, G.diff.label, 3);
+  UI.toast(G.map.name, '', 2);
 }
 
 // abbandono di una partita in corso (dalla pausa): conta comunque
@@ -107,6 +109,8 @@ function goToVillage() {
 // Chiude i conti della partita: bonus sopravvivenza (solo i minuti non ancora pagati),
 // record e statistiche di carriera. Si può chiamare più volte (vittoria e poi modalità infinita).
 function commitRun() {
+  // partita coi trucchi del debug: niente bonus, record, statistiche né missioni
+  if (G.cheat) { G.committed = true; G.killsC = G.kills; G.rs = { elites: 0, chests: 0, evos: 0, bosses: {} }; return null; }
   const mins = Math.floor(G.time / 60);
   const nb = Math.max(0, mins - G.paidMin) * COIN.perMinute * G.diff.coin;
   G.paidMin = mins;
@@ -129,6 +133,7 @@ function step(dt) {
 
   G.time += dt;
   if (G.time >= G.unlockT) checkUnlocks();
+  if (G.reefT > 0 && (G.reefT -= dt) <= 0) spawnReefBoss();   // Scilla emerge poco dopo che sei entrato
   Spawner.update(dt);
   Grid.build(Enemies, Player.x, Player.y);
   updateEnemies(dt);
@@ -138,6 +143,7 @@ function step(dt) {
   updatePlayerContacts(dt);
   updateStrikes(dt);
   updateEShots(dt);
+  if (Death.on && G.state === 'play') Death.update(dt);   // LA MORTE (minuto 14)
   if (G.state !== 'play') return;
   updateGems(dt);
   updateFx(dt);
@@ -173,6 +179,39 @@ function step(dt) {
   }
 }
 
+// LO SCOGLIO DI SCILLA (REEF): dal ponte della Sicilia si passa sull'isoletta del boss, e da lì (dopo averla battuta) si torna.
+// Si cambia solo G.map (G.mapId resta Sicilia: record, sblocchi e vittoria contano per Island). I nemici restano di là.
+function swapIsle(map) {
+  G.map = map; MapGen.reset(map === REEF_MAP ? 'reef' : G.mapId);
+  Enemies.clear(); Projectiles.clear(); EShots.clear(); Zones.clear(); Gems.clear(); FX.clear();
+  Boss.n = 0; Boss.sync(); Strikes.n = 0; UI.showBoss(false);
+  Obs.n = 0; collectObstacles();
+  if (Death.on) Death.place();   // la Morte ti segue anche di là
+  G.flash = 0.1; addShake(4); Sfx.play('portal');
+}
+function enterReef() {
+  if (G.state !== 'play') return;
+  swapIsle(REEF_MAP);
+  G.reefDone = false; G.reefWarned = false; G.reefT = REEF.delay;
+  Player.placeOnBridge(40);
+  UI.toast(REEF.name, '', 3, true);
+}
+function leaveReef() {
+  if (G.state !== 'play') return;
+  swapIsle(MAPS[G.mapId]);
+  Player.placeOnBridge(40);
+  UI.toast(G.map.name, '', 2);
+}
+function spawnReefBoss() {
+  const R = REEF, i = spawnBoss(ET.boss3, true, R.boss, null);
+  if (i < 0) return;
+  const E = Enemies, S = Boss.slotOf(i);
+  S.reef = true;
+  E.x[i] = E.px[i] = 0; E.y[i] = E.py[i] = 0;             // sale dal centro dello scoglio
+  E.hp[i] = E.maxHp[i] = E.maxHp[i] * R.hp; E.dmg[i] *= R.dmg;
+  UI.toast(R.boss.name, '', 3, true);
+}
+
 // SBLOCCHI SEGRETI (UNLOCKS): G.unlockT = il prossimo tempo utile su questa mappa (Infinity se non c'è niente da sbloccare),
 // così lo step fa un solo confronto.
 function nextUnlockTime() {
@@ -180,6 +219,7 @@ function nextUnlockTime() {
   for (const id in UNLOCKS) { const u = UNLOCKS[id]; if (u.map === G.mapId && !Save.unlocked(id) && u.time < G.unlockT) G.unlockT = u.time; }
 }
 function checkUnlocks() {
+  if (G.cheat) { G.unlockT = Infinity; return; }   // i segreti non si sbloccano coi trucchi
   for (const id in UNLOCKS) {
     const u = UNLOCKS[id];
     if (u.map !== G.mapId || Save.unlocked(id) || G.time < u.time) continue;
@@ -188,7 +228,7 @@ function checkUnlocks() {
     if (id === 'teleport') { Player.tele = true; Player.teleCd = 0; document.body.classList.add('has-tele'); }
     spawnFx(FXK.RING, Player.x, Player.y, 0.6, 160);
     Sfx.play('quest');
-    UI.toast('Sbloccato: ' + u.name, u.kind + '. ' + u.desc, 7, true);
+    UI.toast(u.name, '', 4, true);
   }
   nextUnlockTime();
 }
@@ -221,7 +261,7 @@ function winRun() {
   G.victory = true; G.victoryT = 2.2;
   EShots.clear(); Strikes.n = 0;
   addShake(4);
-  UI.toast('Operazione completata', 'Hai resistito ' + Math.round(WIN.time / 60) + ' minuti. HAI VINTO!', 4);
+  UI.toast('Vittoria', '', 3);
 }
 
 function onVictory() {
@@ -229,9 +269,14 @@ function onVictory() {
   G.won = true;
   Player.gainCoins(WIN.reward.coins * G.diff.coin);
   const before = Object.keys(MAPS).filter((id) => Save.mapUnlocked(id));
-  Save.data.wins[G.mapId] = true;
-  Save.write();
+  if (!G.cheat) { Save.data.wins[G.mapId] = true; Save.write(); }   // coi trucchi la mappa dopo non si sblocca
   const unlocked = Object.keys(MAPS).filter((id) => Save.mapUnlocked(id) && before.indexOf(id) < 0);
+  // abilità sbloccata da questa mappa (Dite, Cocito)
+  for (const id in SKILLS) {
+    if (SKILLS[id].win !== G.mapId || Player.skill[id] || !Save.skillOpen(id)) continue;
+    Player.skill[id] = true; Player.skillCd[id] = 0; UI.refreshSkills();
+    UI.toast(SKILLS[id].name, '', 4, true);
+  }
   const record = commitRun();
   Sfx.play('victory');
   UI.showEnd('win', record, unlocked.length ? MAPS[unlocked[0]].name : null);
@@ -249,7 +294,7 @@ function continueEndless() {
   Player.invT = 2;
   acc = 0;
   setState('play');
-  UI.toast('Modalità infinita', 'Quanto resisti?', 4);
+  UI.toast('Modalità infinita', '', 2);
 }
 
 // opzioni salvate -> configurazione attiva
@@ -282,19 +327,25 @@ function handleKeys() {
   if (Input.consume('KeyO')) { G.debug = !G.debug; UI.setDebug(G.debug); }
   if (s === 'play' && Input.consume('KeyF')) UI.toggleFast();
   if (s === 'play') {
-    if (Input.consume('Space') || Input.consume('ShiftLeft') || Input.consume('ShiftRight') || Input.dashReq) { Input.dashReq = false; Player.tryDash(); }
-    // vicino al Magister E/Invio parlano con lui; altrimenti E/Q = teletrasporto
+    // vicino al Magister E/Invio parlano con lui; altrimenti Spazio/E/Q = teletrasporto
     if (Camp.near && (Input.consume('KeyE') || Input.consume('Enter'))) Camp.talk();
-    else if (Input.consume('KeyE') || Input.consume('KeyQ') || Input.teleReq) { Input.teleReq = false; Player.tryTeleport(); }
-    if (Input.consume('KeyI')) G.god = !G.god;
-    if (Input.consume('KeyP')) debugSpawn(300);
-    if (Input.consume('KeyB')) debugBoss();
+    else if (Input.consume('Space') || Input.consume('KeyE') || Input.consume('KeyQ') || Input.teleReq) { Input.teleReq = false; Player.tryTeleport(); }
+    // abilità: 1/Z = Ira di Dite, 2/X = Gelo di Cocito (sul telefono i loro tasti)
+    if (Input.consume('Digit1') || Input.consume('KeyZ') || Input.skillReq === 'ira') Player.trySkill('ira');
+    if (Input.consume('Digit2') || Input.consume('KeyX') || Input.skillReq === 'gelo') Player.trySkill('gelo');
+    Input.skillReq = null;
+    // trucchi: solo con la finestra debug aperta (tasto O), e la partita non conta più
+    if (G.debug) {
+      if (Input.consume('KeyI')) { G.god = !G.god; G.cheat = true; }
+      if (Input.consume('KeyP')) { debugSpawn(300); G.cheat = true; }
+      if (Input.consume('KeyB')) { debugBoss(); G.cheat = true; }
+    }
   }
   if (s === 'village' && (Input.consume('KeyE') || Input.consume('Enter') || Input.consume('Space'))) Village.talk();
   if (s === 'menu' && Input.consume('Enter')) UI.action('play');
   if (s === 'menu' && (Input.consume('ArrowLeft') || Input.consume('KeyA'))) UI.action('map-prev');
   if (s === 'menu' && (Input.consume('ArrowRight') || Input.consume('KeyD'))) UI.action('map-next');
-  if (s !== 'play') { Input.dashReq = false; Input.teleReq = false; }
+  if (s !== 'play') { Input.teleReq = false; Input.skillReq = null; }
   if (s === 'levelup') UI.levelUpKeys();
   if (s === 'chest' && (Input.consume('Enter') || Input.consume('Space') || Input.consume('KeyE'))) UI.closeChest();
   if (s === 'dead' && performance.now() - G.deadAt > 600) {
@@ -389,7 +440,22 @@ function boot() {
   const flushSave = () => { if (Save.data) { Save._local(); Cloud.flush(); } };
   document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
   window.addEventListener('pagehide', flushSave);
+  installWebApp();
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
+}
+
+// WEB APP (icona in Home sull'iPhone):
+//  - service worker (sw.js): copia i file sul telefono, così il gioco parte anche offline.
+//    In locale (localhost) è spento per non tenersi file vecchi mentre lo modifichi: per provarlo apri con ?sw=1
+//  - salvataggio persistente: chiede al browser di non cancellare il localStorage quando manca spazio
+function installWebApp() {
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && (!local || /[?&]sw=1/.test(location.search))) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* senza offline si gioca lo stesso */ });
+  }
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persisted().then((p) => p || navigator.storage.persist()).catch(() => {});
+  }
 }
 
 MonsterArt.load(boot);

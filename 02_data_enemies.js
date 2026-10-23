@@ -20,7 +20,15 @@ const ENEMY_DEFS = [
   { id: 'lupa',    name: 'Lupa',              sprite: 'slime_lupa',    hp: 22, speed: 96,  dmg: 9,  r: 12, mass: 1.0, xp: 3, coin: 0.018, splat: 'C' },
   { id: 'furia',   name: 'Erinys',           sprite: 'slime_furia',   hp: 18, speed: 70,  dmg: 8,  r: 12, mass: 1.0, xp: 3, coin: 0.018, splat: 'D' },
   { id: 'gelido',  name: 'Proditor',         sprite: 'slime_gelido',  hp: 30, speed: 54,  dmg: 9,  r: 13, mass: 2.0, xp: 3, coin: 0.018, splat: 'u' },
+  // TESCHIO viola in fiamme: dal minuto 11 (SKULLS.time) arrivano SOLO loro (sprite in skull.png)
+  { id: 'skull',   name: 'Calvaria',         sprite: 'mob_skull',     hp: 34, speed: 100, dmg: 11, r: 13, mass: 1.3, xp: 4, coin: 0.02,  splat: '8' },
 ];
+// dal minuto 11 in poi i nuovi nemici (normali e sciami) sono solo teschi; niente più Cacciatori
+const SKULLS = { time: 660 };
+// LA MORTE — minuto 14, su tutte le mappe. Non si può uccidere (le armi la attraversano) e ti uccide con un colpo solo.
+// Cammina verso di te sempre più veloce (velocità = la tua x speed, che sale di accel al secondo fino a max).
+//   r = raggio del tocco | warnAt = avviso | scale = grandezza dello sprite | portrait = secondi del ritratto a tutto schermo (il gioco si ferma)
+const DEATH = { time: 840, warnAt: 828, speed: 0.72, accel: 0.012, max: 1.3, r: 40, scale: 2.2, portrait: 2.4 };
 // LUPA (Selva Oscura): ti punta, si ferma un attimo e balza (come un piccolo Cacciatore)
 const LUPA = { chaseTime: 1.7, tell: 0.35, dashSpeed: 330, dashTime: 0.32 };
 // FURIA (Città di Dite): tiene le distanze e lancia ventagli di 3 fiammate
@@ -44,9 +52,12 @@ const ELITE = {
   dashTime: 0.45,
 };
 
-// NOTTE — dopo il minuto 6: ogni 60 s, 40 di giorno e 20 di notte
+// NOTTE — dopo il minuto 6: ogni 60 s, 40 di giorno e 20 di notte; dal minuto 11 (forever) la notte non finisce più.
+// Di notte il mondo si spegne (tranne il cerchio di luce) ma i dannati restano visibili, solo un po' più scuri (enemyDim).
 const NIGHT = {
   start: 360, cycle: 60, nightLen: 20,
+  forever: 660,           // da qui notte perenne
+  enemyDim: 0.3,          // quanto si scuriscono i dannati fuori dalla luce (0..1, sopra al velo)
   lightR: 150,            // raggio (unità di mondo) della luce attorno al personaggio
   dark: 0.9,              // quanto è scuro il mondo fuori dalla luce (0..1)
   fade: 2.5,              // secondi del crepuscolo / dell'alba
@@ -89,13 +100,26 @@ const BOSS3 = {
   summonEvery: 10,
 };
 
-// SCATTO — abilità di tutti i personaggi: Spazio (PC) o doppio tocco (telefono)
-// Breve corsa velocissima e invulnerabile. Eek alla fine lancia un ventaglio di kunai.
-const DASH = { cd: 3.5, cdEek: 2.8, time: 0.16, speed: 950, iframes: 0.32, kunai: 5, kunaiDmg: 16, spread: 0.22 };
+// (lo SCATTO coi kunai è stato tolto il 2026-10-23: resta solo il teletrasporto)
 
-// TELETRASPORTO — abilità segreta (resisti fino all'11:00 nella Palude, vedi UNLOCKS): tasto E/Q (PC) o il tasto TELE (telefono).
+// TELETRASPORTO — abilità segreta (resisti fino all'11:00 in Sardegna, vedi UNLOCKS): Spazio/E/Q (PC) o il tasto TELE (telefono).
 // Sparisci e ricompari `dist` più in là (circa 6 passi) nella direzione in cui vai, scavalcando chi ti sta davanti.
 const TELEPORT = { cd: 4.5, dist: 175, iframes: 0.35, ghosts: 5 };
+// FRECCE SCHIVATE — una freccia degli Arcieri che ti passa vicino (entro `r`) senza colpirti = una schivata.
+// Il conto è per sempre (Save.data.dodges) e parte quando hai il teletrasporto: a `dodges` il teletrasporto si potenzia.
+const DODGE = { r: 60 };
+// TELETRASPORTO POTENZIATO: più lontano, ricarica più breve, più invulnerabilità e un'onda d'urto dove atterri
+// (blastDmg cresce col tempo come la vita degli slime, x il danno del personaggio)
+const TELE_UP = { dodges: 50, cd: 3, dist: 240, iframes: 0.6, ghosts: 7, blastR: 95, blastDmg: 30, blastKb: 420 };
+// ABILITÀ — si sbloccano per sempre vincendo (minuto 7) la mappa `win`: le ultime due, Dite e Cocito.
+// Tasti 1/2 o Z/X (PC), sul telefono i tasti sopra al TELE. La Magia della Locanda: +potenza, -ricarica.
+//   cd = ricarica (s) | r = raggio | dmg = danno base (cresce col tempo come la vita degli slime) | kb = spinta | time = durata del gelo
+const SKILLS = {
+  ira:  { name: 'Ira di Dite',     label: 'IRA',  win: 'dite',   cd: 14, r: 170, dmg: 70, kb: 650,
+          desc: 'Le mura infuocate di Dite esplodono attorno a te: danno e spinta fortissima.' },
+  gelo: { name: 'Gelo di Cocito',  label: 'GELO', win: 'cocito', cd: 22, r: 360, dmg: 25, time: 3,
+          desc: 'Il ghiaccio di Cocito blocca sul posto tutti i dannati vicini per 3 secondi.' },
+};
 
 // ARCIERE (Iracundus, ex Sputacchino) — pochi, ma pericolosi: si ferma, tende l'arco (linea di mira che ti segue,
 // poi si blocca e diventa bianca) e scocca UNA freccia grossa e veloce che toglie tanta vita. Le colonne fanno da riparo.

@@ -145,6 +145,76 @@ const Render = {
     }
   },
 
+  // SICILIA (ISLAND): spiaggia + mare oltre la costa + schiuma. Si disegna solo quando la costa entra nella vista.
+  // La costa è il poligono di G.map.isle.r: sabbia = tratto largo sulla costa, poi il mare copre tutto ciò che sta fuori.
+  drawSea(S, ox, oy, camX, camY, rt) {
+    const ctx = this.ctx, W = this.W, H = this.H, U = CFG.UNIT, I = G.map.isle, N = I.N;
+    const reach = Math.sqrt(W * W + H * H) * 0.5 * U + I.beach + 40;
+    if (Math.sqrt(camX * camX + camY * camY) + reach < I.min) return;
+    if (!this.seaPat) {
+      // mattonella del mare 32x32: blu-nero con increspature chiare (pixel art)
+      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const g = c.getContext('2d');
+      g.fillStyle = '#071b27'; g.fillRect(0, 0, 32, 32);
+      g.fillStyle = '#0a2433';
+      for (let y = 0; y < 32; y++) for (let x = (y & 1); x < 32; x += 2) if (((x * 7 + y * 13) % 11) < 4) g.fillRect(x, y, 1, 1);
+      g.fillStyle = '#16465c'; g.fillRect(3, 5, 5, 1); g.fillRect(19, 12, 6, 1); g.fillRect(9, 21, 4, 1); g.fillRect(24, 27, 5, 1);
+      g.fillStyle = '#2a6e86'; g.fillRect(4, 4, 3, 1); g.fillRect(20, 11, 3, 1); g.fillRect(25, 26, 2, 1);
+      this.seaPat = ctx.createPattern(c, 'repeat');
+      this.seaMat = typeof DOMMatrix !== 'undefined' ? new DOMMatrix() : null;
+    }
+    const path = (f) => {
+      ctx.beginPath();
+      for (let k = 0; k < N; k++) {
+        const a = k / N * Math.PI * 2, r = I.r[k] * f * S, x = Math.cos(a) * r + ox, y = Math.sin(a) * r + oy;
+        if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      }
+      ctx.closePath();
+    };
+    // spiaggia: sabbia chiara verso il mare, più scura (bagnata) sul bordo
+    path(1);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#7d6c45'; ctx.lineWidth = I.beach * 2 * S; ctx.stroke();
+    ctx.strokeStyle = '#9c8957'; ctx.lineWidth = I.beach * 1.2 * S; ctx.stroke();
+    // mare: rettangolo della vista meno l'isola (evenodd), con il motivo che scorre piano (onde)
+    ctx.rect(-4, -4, W + 8, H + 8);
+    if (this.seaMat) { this.seaMat.e = ox + ((rt * 6) % 32); this.seaMat.f = oy + Math.sin(rt * 0.8) * 2; this.seaPat.setTransform(this.seaMat); }
+    ctx.fillStyle = this.seaPat; ctx.fill('evenodd');
+    // schiuma sulla riva + un'onda più al largo, tratteggiate e in movimento
+    ctx.setLineDash([3, 4]);
+    ctx.lineDashOffset = -rt * 8;
+    ctx.strokeStyle = 'rgba(214,236,232,.75)'; ctx.lineWidth = 1; path(1); ctx.stroke();
+    ctx.lineDashOffset = rt * 5;
+    ctx.strokeStyle = 'rgba(120,180,190,.35)'; path(1 + (6 + Math.sin(rt * 1.3) * 3) / I.R); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    // PONTE di legno sul mare (l'unico): ombra sull'acqua, assi, parapetti, pali; in fondo la porta verso l'altra isola
+    const B = G.map.bridge;
+    if (B) {
+      const t0 = B.r0 - I.beach, L = Math.round((B.len + I.beach) * S), w = Math.round(B.w * S), hw = w >> 1;
+      ctx.save();
+      ctx.translate(B.ux * t0 * S + ox, B.uy * t0 * S + oy); ctx.rotate(B.a);
+      ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(3, -hw + 4, L, w);
+      ctx.fillStyle = '#2a1a0e'; for (let q = 14; q < L; q += 24) { ctx.fillRect(q, -hw - 3, 3, 4); ctx.fillRect(q, hw - 1, 3, 4); }
+      ctx.fillStyle = '#6b4a2b'; ctx.fillRect(0, -hw, L, w);
+      ctx.fillStyle = '#563a20'; for (let q = 0; q < L; q += 5) ctx.fillRect(q, -hw, 1, w);
+      ctx.fillStyle = '#82603a'; for (let q = 2; q < L; q += 15) ctx.fillRect(q, -hw + 3, 2, 1);
+      ctx.fillStyle = '#3a2513'; ctx.fillRect(0, -hw, L, 2); ctx.fillRect(0, hw - 2, L, 2);
+      ctx.restore();
+      const te = B.r0 + B.len, gx = Math.round(B.ux * te * S) + ox, gy = Math.round(B.uy * te * S) + oy;
+      if (!G.map.reef || G.reefDone) {
+        // porta aperta: un anello giallo fluo che pulsa (con un filo di rosa)
+        const pr = hw + 2 + Math.round(Math.sin(rt * 4) * 2);
+        ctx.globalAlpha = 0.35; this.ditherDisk(gx, gy, pr + 4, this.pat(PAL.K)); ctx.globalAlpha = 1;
+        this.circle(gx, gy, pr, '#f0ff1a'); this.circle(gx, gy, pr - 3, '#ff2e88');
+      } else {
+        // sbarrato finché Scilla è viva: travi incrociate sul ponte
+        const bx = Math.round(B.ux * (B.r0 + 8) * S) + ox, by = Math.round(B.uy * (B.r0 + 8) * S) + oy;
+        ctx.strokeStyle = '#5a1018'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(bx - hw, by - hw); ctx.lineTo(bx + hw, by + hw); ctx.moveTo(bx + hw, by - hw); ctx.lineTo(bx - hw, by + hw); ctx.stroke();
+      }
+    }
+  },
+
   // VELO DELLA NOTTE: canvas a parte (pixel del gioco) riempito di blu-nero, con un buco netto attorno a (lx, ly)
   // e un anello a retino sul bordo della luce; poi steso sopra al mondo in un colpo solo.
   nightVeil(k, lx, ly, LR) {
@@ -313,6 +383,16 @@ const Render = {
     ctx.setTransform(2, 0, 0, 2, 0, 0);
     drawMapLayer('props');
     drawMapLayer('obstacles');
+    if (G.map.isle) this.drawSea(S, ox, oy, camX, camY, rt);
+    // GOAT (Sicilia, in alto): sagoma tutta nera, il doppio di un boss, ferma
+    const goat = G.map.goat, goatS = SPR.cache.goat;
+    if (goat && goatS) {
+      const gw = goatS.w * goat.scale, gh = goatS.h * goat.scale, gx = Math.round(goat.x * S) + ox, gy = Math.round(goat.y * S) + oy;
+      if (gx + gw > 0 && gx - gw < W && gy > -20 && gy - gh < H + 20) {
+        ctx.globalAlpha = 0.5; ctx.fillStyle = '#000'; ctx.fillRect(gx - (gw >> 1) + 6, gy - 3, gw - 12, 6); ctx.globalAlpha = 1;
+        ctx.drawImage(goatS.img, gx - (gw >> 1), gy - gh + 4, gw, gh);
+      }
+    }   // Sicilia: spiaggia e mare oltre la costa
     const camp = Camp.here();
     if (camp) Camp.drawGround(ctx, S, ox, oy, rt);   // accampamento del Magister (Cattedrale)
 
@@ -390,8 +470,16 @@ const Render = {
       }
     }
 
+    // NOTTE: velo blu-nero sul mondo (terreno, ostacoli, pozze, gemme) tranne il cerchio di luce attorno a te.
+    // I dannati e i boss si disegnano SOPRA al velo (si vedono sempre), poi li scurisce un velo più leggero (NIGHT.enemyDim).
+    let veilK = 0;
+    if (G.nightK > 0) {
+      veilK = Math.ceil(G.nightK * 16) / 16;   // 16 gradini: il velo si ridisegna di rado
+      this.nightVeil(veilK, ppx, ppy, Math.round(NIGHT.lightR * S * (1.6 - 0.6 * veilK)));
+    }
+
     // nemici: 2 frame di animazione "molle", sagoma bianca quando colpiti
-    const E = Enemies, n = E.count, night = G.night, eliteT = ET.elite, ghostT = ET.ghost;
+    const E = Enemies, n = E.count, night = G.night, eliteT = ET.elite, ghostT = ET.ghost, cute = !!G.map.cute;
     // zone dei fulmini (sotto ai nemici)
     for (let k = 0; k < Strikes.n; k++) {
       const sx = Math.round(Strikes.x[k] * S) + ox, sy = Math.round(Strikes.y[k] * S) + oy;
@@ -414,7 +502,8 @@ const Render = {
       const x = E.px[i] * ia + E.x[i] * alpha, y = E.py[i] * ia + E.y[i] * alpha;
       if (x < L || x > R || y < T || y > B) continue;
       const type = E.type[i], name = ENEMY_DEFS[type].sprite;
-      const s0 = (night && SPR.cache[name + '_d']) || SPR.cache[name];
+      // Sicilia (mappa `cute`): gli slime simpatici verdi, anche di notte
+      const s0 = (cute && SPR.cache['cute_' + ENEMY_DEFS[type].id]) || (night && SPR.cache[name + '_d']) || SPR.cache[name];
       const s = s0.m && ((Player.x < x) === (s0.face > 0)) ? s0.m : s0;   // si gira verso di te
       const f = ((t * 5 + E.phase[i]) | 0) & 1;
       let img = E.flash[i] > 0 ? (f ? s.flash2 : s.flash) : (f ? s.img2 : s.img);
@@ -426,6 +515,8 @@ const Render = {
       if (E.frz[i] > 0) this.frozen(x, y, E.r[i], E.frzM[i], rt);
     }
     if (Boss.active) this.drawBoss(alpha, rt);
+    // notte: i dannati fuori dalla luce un po' più scuri (lo stesso velo, più leggero)
+    if (veilK > 0) { ctx.globalAlpha = NIGHT.enemyDim; ctx.drawImage(this.veilCv, 0, 0, W, H); ctx.globalAlpha = 1; }
 
     // granate (in volo con parabola) + ombra
     const P = Projectiles, bs = SPR.cache.bomb;
@@ -442,27 +533,24 @@ const Render = {
       this.spr(sp, P.evo[i] ? sp.neon : sp.img, x, y - h);
     }
 
-    // NOTTE: velo blu-nero su tutto il mondo (terreno, ostacoli, gemme, nemici, boss) tranne il cerchio di luce
-    // attorno a te; fuori dalla luce si vedono solo gli occhi rossi dei dannati. Le armi e i colpi restano sopra.
-    if (G.nightK > 0) {
-      const k = Math.ceil(G.nightK * 16) / 16, LR = Math.round(NIGHT.lightR * S * (1.6 - 0.6 * k));   // 16 gradini: il velo si ridisegna di rado
-      this.nightVeil(k, ppx, ppy, LR);
-      if (k > 0.5) {
-        ctx.globalAlpha = (k - 0.5) * 2; ctx.fillStyle = PAL.D;
-        const r2 = (LR - 6) * (LR - 6);
-        for (let i = 0; i < n; i++) {
-          if (E.alive[i] === 0 || E.big[i] !== 0) continue;
-          const sx = Math.round(E.x[i] * S) + ox, sy = Math.round(E.y[i] * S) + oy;
-          if (sx < 0 || sx >= W || sy < 0 || sy >= H) continue;
-          const dx = sx - ppx, dy = sy - ppy;
-          if (dx * dx + dy * dy < r2) continue;
-          const ey = sy - ((E.r[i] * S * 0.3) | 0);
-          ctx.fillRect(sx - 2, ey, 1, 1); ctx.fillRect(sx + 1, ey, 1, 1);
-        }
+    if (camp) Camp.drawLit(ctx, S, ox, oy, rt);
+    // LA MORTE (minuto 14): bianca come un osso, alone nero, sempre sopra al buio
+    const ds = SPR.cache.death;
+    if (Death.on && G.scene === 'run') {
+      const dx0 = Math.round((Death.px * ia + Death.x * alpha) * S) + ox, dy0 = Math.round((Death.py * ia + Death.y * alpha) * S) + oy;
+      const sc = ds && ds.head ? DEATH.scale : 1.15;   // la testa è piccola: si disegna grande
+      const dw = ds ? Math.round(ds.w * sc) : 30, dh = ds ? Math.round(ds.h * sc) : 40;
+      if (dx0 + dw > 0 && dx0 - dw < W && dy0 + dh > 0 && dy0 - dh < H) {
+        // alone di fuoco rosa-rosso che pulsa (la testa resta leggibile su qualunque terreno, anche di notte)
+        ctx.globalAlpha = 0.45 + 0.15 * Math.sin(rt * 5); this.ditherDisk(dx0, dy0 - 6, Math.round(DEATH.r * S * 2.4), this.pat('#a0123f')); ctx.globalAlpha = 1;
+        // la testa fluttua (su e giù) centrata sul punto; la vecchia figura invece poggia i piedi
+        const top = ds && ds.head ? dy0 - (dh >> 1) - 6 + Math.round(Math.sin(rt * 2.4) * 3) : dy0 - dh + Math.round(DEATH.r * S);
+        ctx.globalAlpha = 0.85 + 0.15 * Math.sin(rt * 9);
+        if (ds) ctx.drawImage(Death.face < 0 ? ds.mir : ds.img, dx0 - (dw >> 1), top, dw, dh);
+        else this.circle(dx0, dy0, 14, PAL.w);
         ctx.globalAlpha = 1;
       }
-    }
-    if (camp) Camp.drawLit(ctx, S, ox, oy, rt);       // la lanterna del Magister si vede anche di notte
+    }       // la lanterna del Magister si vede anche di notte
 
     // ARCIERI che tendono l'arco: linea di mira tratteggiata (rossa mentre ti segue, bianca e fitta quando è bloccata).
     // Sta sopra al velo della notte: il pericolo si vede sempre.
@@ -489,7 +577,7 @@ const Render = {
     // player
     const ps = Player.frame(rt);
     const bob = !Player.anim && Player.moving && (((rt * 8) | 0) & 1) ? 1 : 0;   // chi non ha la corsa animata "saltella"
-    // il personaggio (e le copie dello scatto) si disegnano dopo, in alta risoluzione: qui si prepara la richiesta
+    // il personaggio (e le copie del teletrasporto) si disegnano dopo, in alta risoluzione: qui si prepara la richiesta
     const PD = this.pd;
     PD.n = 0; PD.trail = 0;
     for (let k = 0; k < Player.trailN; k++) {
@@ -511,7 +599,7 @@ const Render = {
     }
     // durante l'invulnerabilità lampeggia; morendo diventa una sagoma chiara e poi esplode
     const dying = G.state === 'dying' || (G.state === 'dead' && !G.won);
-    const invBlink = Player.invT > 0 && !hurt && Player.dashT <= 0 && Player.trailN === 0 && (((rt * 20) | 0) & 1);  // durante lo scatto niente lampeggio
+    const invBlink = Player.invT > 0 && !hurt && Player.trailN === 0 && (((rt * 20) | 0) & 1);  // durante il teletrasporto niente lampeggio
     if (dying) {
       if (G.state === 'dying' && G.dyingT > 1.15) { PD.n = 1; PD.img = (((rt * 14) | 0) & 1) ? ps.flash : (left ? ps.mirFlash : ps.hurtImg); PD.x = ppx; PD.y = ppy; }
       else if (!this._burst && G.state === 'dying') {
@@ -856,10 +944,12 @@ const Render = {
     ctx.fillStyle = PAL.A; ctx.fillRect(bx, by, bw, 2);
     ctx.fillStyle = lowHp && (((rt * 8) | 0) & 1) ? PAL.I : PAL.D;
     ctx.fillRect(bx, by, Math.ceil(bw * Player.hp / Player.maxHp), 2);
-    // ricarica dello scatto: barretta viola sotto la vita (chiara = pronto)
-    const dcd = (Player.kunai ? DASH.cdEek : DASH.cd) * Player.cdMult, dr = Player.dashCd > 0 ? 1 - Player.dashCd / dcd : 1;
-    ctx.fillStyle = PAL.k; ctx.fillRect(bx - 1, by + 3, bw + 2, 2);
-    ctx.fillStyle = dr >= 1 ? PAL[9] : PAL.n; ctx.fillRect(bx, by + 3, Math.round(bw * dr), 1);
+    // ricarica del teletrasporto: barretta sotto la vita (chiara = pronto)
+    if (Player.tele) {
+      const tcd = Player.teleCdMax(), dr = Player.teleCd > 0 ? 1 - Player.teleCd / tcd : 1;
+      ctx.fillStyle = PAL.k; ctx.fillRect(bx - 1, by + 3, bw + 2, 2);
+      ctx.fillStyle = dr >= 1 ? PAL[9] : PAL.n; ctx.fillRect(bx, by + 3, Math.round(bw * dr), 1);
+    }
 
     }
     this.drawJoystick();
@@ -897,6 +987,14 @@ const Render = {
       }
       // il Magister: freccia dorata, da quando hai visto la sua lanterna
       if (Camp.seen && G.mapId === MAGISTER_CAMP.map) this.pointer(Math.round(MAGISTER_CAMP.x * S) + ox, Math.round(MAGISTER_CAMP.y * S) + oy, PAL.K, PAL.Z, rt, 0);
+      // LA MORTE: freccia bianca grande, sempre
+      if (Death.on) this.pointer(Math.round(Death.x * S) + ox, Math.round(Death.y * S) + oy, PAL.w, PAL.k, rt, 1);
+      // il PONTE: freccia quando sei vicino alla costa da quella parte (sullo Scoglio solo quando è aperto)
+      const Bq = G.map.bridge;
+      if (Bq && (!G.map.reef || G.reefDone)) {
+        const bx = Bq.ux * Bq.r0, by = Bq.uy * Bq.r0, ddx = bx - Player.x, ddy = by - Player.y;
+        if (ddx * ddx + ddy * ddy < 2600 * 2600) this.pointer(Math.round(bx * S) + ox, Math.round(by * S) + oy, PAL.K, PAL.L, rt, 0);
+      }
     }
 
     // vita bassa: bordi rossi che pulsano
@@ -989,7 +1087,7 @@ const Render = {
     for (let i = 0; i < E.count; i++) {
       if (E.alive[i] === 0 || E.big[i] === 0) continue;
       const x = E.px[i] * ia + E.x[i] * alpha, y = E.py[i] * ia + E.y[i] * alpha;
-      const B = Boss.slotOf(i), cfg = (B && B.trial) ? B.cfg : bossCfg(E.type[i]);   // i Custodi hanno il loro aspetto
+      const B = Boss.slotOf(i), cfg = (B && (B.trial || B.reef)) ? B.cfg : bossCfg(E.type[i]);   // i Custodi e Scilla hanno il loro aspetto
       const s = (cfg && SPR.cache[cfg.sprite]) || SPR.cache[ENEMY_DEFS[E.type[i]].sprite];
       const sx = Math.round(x * S) + this.ox, sy = Math.round(y * S) + this.oy;
       const flip = s.face ? ((Player.x < x) === (s.face > 0)) : (cfg && cfg.faces === 'left' && s.mir && Player.x > x);   // si gira verso di te

@@ -83,7 +83,7 @@ function spawnBoss(type, quiet, cfg, trial) {
   if (i < 0) return -1;
   const S = Boss.slots[Boss.n];
   Boss.list[Boss.n++] = i;
-  S.kind = type; S.uid = Enemies.uid[i]; S.cfg = cfg || bossCfg(type) || {}; S.trial = trial || null;
+  S.kind = type; S.uid = Enemies.uid[i]; S.cfg = cfg || bossCfg(type) || {}; S.trial = trial || null; S.reef = false;
   S.state = 'walk'; S.volley = 0;
   S.t = type === ET.boss ? BOSS.chargeEvery : type === ET.boss2 ? BOSS2.strikeEvery : BOSS3.burstEvery;
   S.spiralT = 0; S.spiralA = 0; S.shotT = 0;
@@ -91,7 +91,7 @@ function spawnBoss(type, quiet, cfg, trial) {
   Boss.sync();
   addShake(6);
   Sfx.play('warn');
-  if (!quiet) UI.toast('Errore critico', slotName(S) + ' è arrivato.', 4);
+  if (!quiet) UI.toast(slotName(S), '', 3);
   UI.showBoss(true);
   return i;
 }
@@ -105,7 +105,7 @@ function spawnTrial(key) {
   const E = Enemies;
   E.hp[i] = E.maxHp[i] = E.maxHp[i] * TRIAL.hp;
   E.dmg[i] *= TRIAL.dmg;
-  UI.toast('Prova del Magister', c.name + ' custodisce ' + sp.name + '. Battila e la fusione è tua per sempre.', 6, true);
+  UI.toast(c.name, '', 3, true);
   return true;
 }
 
@@ -113,7 +113,7 @@ function spawnTrial(key) {
 function spawnBossDuo() {
   Boss.spawnedDuo = true;
   spawnBoss(ET.boss2, true); spawnBoss(ET.boss3, true);
-  UI.toast('Errore critico', bossName(ET.boss2) + ' e ' + bossName(ET.boss3) + ' sono arrivati insieme.', 5);
+  UI.toast(bossName(ET.boss2) + ' · ' + bossName(ET.boss3), '', 3);
 }
 
 // i tre boss della mappa insieme (minuto 10, solo in modalità infinita).
@@ -121,16 +121,16 @@ function spawnBossDuo() {
 function spawnBossTrio() {
   Boss.spawnedTrio = true;
   for (const type of [ET.boss, ET.boss2, ET.boss3]) if (!Boss.has(type)) spawnBoss(type, true);
-  UI.toast('Errore critico', bossNames() + (Boss.n > 1 ? ' sono arrivati insieme.' : ' è arrivato.'), 5);
+  UI.toast(bossNames().replace(/, | e /g, ' · '), '', 3);
 }
 
 function onBossKilled(i) {
   const E = Enemies, x = E.x[i], y = E.y[i], type = E.type[i], id = ENEMY_DEFS[type].id;
-  let name = bossName(type), trial = null;
+  let name = bossName(type), trial = null, reef = false;
   // toglie il boss dalla lista (scambio con l'ultimo: anche lo stato segue)
   for (let k = 0; k < Boss.n; k++) {
     if (Boss.list[k] !== i) continue;
-    name = slotName(Boss.slots[k]); trial = Boss.slots[k].trial;
+    name = slotName(Boss.slots[k]); trial = Boss.slots[k].trial; reef = Boss.slots[k].reef;
     Boss.n--;
     const s = Boss.slots[k];
     Boss.list[k] = Boss.list[Boss.n]; Boss.slots[k] = Boss.slots[Boss.n]; Boss.slots[Boss.n] = s;
@@ -147,7 +147,7 @@ function onBossKilled(i) {
     spawnGem(x, y, CFG.drops.healAmount, GK.HEAL);
     spawnFx(FXK.RING, x, y, 0.6, 160);
     UI.showBoss(Boss.n > 0);
-    UI.toast('Fusione sbloccata', name + ' è svanita. ' + FUSION_SPECIAL[trial].name + ' è tua: porta al massimo le due armi e fondile dal level up.', 7, true);
+    UI.toast(FUSION_SPECIAL[trial].name, '', 4, true);
     return;
   }
   G.rs.bosses[id] = (G.rs.bosses[id] || 0) + 1;
@@ -172,7 +172,17 @@ function onBossKilled(i) {
   }
   addShake(6);
   UI.showBoss(Boss.n > 0);
-  UI.toast('Operazione completata', name + ' è stato dissolto.' + (Boss.n > 0 ? ' Ne restano ' + Boss.n + '.' : ''), 4);
+  if (reef) {
+    // SCILLA battuta: il ponte si riapre; la prima volta l'Aruspice legge un terzo omen su ogni oggetto
+    G.reefDone = true;
+    const first = !Save.data.reef;
+    if (!G.cheat) { Save.data.reef = (Save.data.reef | 0) + 1; Save.write(); }
+    spawnGem(x - 30, y + 24, 3, GK.CHEST);
+    Sfx.play('quest');
+    UI.toast(name, '', 3, true);
+    return;
+  }
+  UI.toast(name, '', 2);
 }
 
 function bossWalk(i, dt, d, dx, dy) {

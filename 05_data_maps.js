@@ -6,9 +6,16 @@
 // hp/dmg/coin = moltiplicatori sopra la difficoltà; obstacles = ostacoli per blocco di mappa.
 // ----------------------------------------------------------------------------
 const MAPS = {
-  cripta:     { name: 'La Cripta', short: 'Cripta',                 floor: 'cripta',     props: ['pl_tuft', 'pl_sprout', 'pl_leaves', 'pl_fern'], obstacle: 'o_col_half', obstacles: 1, obsR: 11, layout: 'ruins', temple: 0.2, stoa: 0.22,
-                hp: 1.0, dmg: 1.0, coin: 1.0, unlock: null,     spitter: 1.0, swarm: 1.0, desc: '"Per me si va ne la città dolente."' },
-  palude:     { name: 'La Palude Marcia', short: 'Palude',          floor: 'palude',     props: ['pl_reed', 'pl_tuft', 'pl_bush', 'pl_fern'], obstacle: 'o_tree',     obstacles: 3, obsR: 16,
+  // ISLAND (id 'cripta' per non rompere i salvataggi): un'isola grandissima di rovine, circondata dal mare (ISLAND)
+  cripta:     { name: 'Sicilia', short: 'Sicilia',                  floor: 'cripta',     props: ['pl_tuft', 'pl_sprout', 'pl_leaves', 'pl_fern'], obstacle: 'o_col_half', obstacles: 1, obsR: 11, layout: 'ruins', temple: 0.2, stoa: 0.22,
+                island: true,
+                // SICILIA = muro iniziale: slime simpatici (cute) ma POCHI e CATTIVISSIMI. Le prime partite durano pochi secondi:
+                // per andare avanti serve fortuna (jackpot = pioggia di monete rara) e spendere alla Locanda.
+                //   spawn = quanti nemici rispetto al normale | mobDmg / mobSpeed = danno e velocità dei nemici normali (non dei boss)
+                //   jackpot: chance = probabilità per uccisione, coins = [min, max] monete che piovono
+                cute: true, spawn: 0.5, mobDmg: 4, mobSpeed: 1.35, jackpot: { chance: 0.012, coins: [12, 30] },
+                hp: 1.0, dmg: 1.0, coin: 1.0, unlock: null,     spitter: 1.0, swarm: 0.5, desc: '"Per me si va ne la città dolente." Un\'isola di rovine: oltre la spiaggia, solo mare.' },
+  palude:     { name: 'Sardegna', short: 'Sardegna',                floor: 'palude',     props: ['pl_reed', 'pl_tuft', 'pl_bush', 'pl_fern'], obstacle: 'o_tree',     obstacles: 3, obsR: 16,
                 hp: 1.25, dmg: 1.12, coin: 1.25, unlock: 'cripta', spitter: 1.0, swarm: 1.6, special: 'toxic', specialShare: 0.16,
                 desc: '"Fitti nel limo dicon: Tristi fummo."' },
   cattedrale: { name: 'La Cattedrale Sconsacrata', short: 'Cattedrale', floor: 'cattedrale', props: ['pl_sprout', 'pl_tuft', 'pl_leaves'],  obstacle: 'o_col',      obstacles: 4, obsR: 11, layout: 'ruins', temple: 0.32, stoa: 0.25,
@@ -65,13 +72,81 @@ for (const id in MAP_BOSSES) for (const b of ['b2', 'b3']) { const c = MAP_BOSSE
 const MAP_CHUNK = 480;    // lato di un blocco di mappa (unità) per decorazioni e ostacoli
 
 // ----------------------------------------------------------------------------
+// ISOLE — mappe finite circondate dal mare (Sicilia e lo Scoglio di Scilla). La costa è un cerchio "mosso" attorno a (0, 0).
+// Oltre la costa c'è il mare: nessuno ci può entrare (player e dannati vengono tenuti a riva). La mappa ha `isle` = la sua isola.
+//   R = raggio medio | wob = onde della costa [ampiezza, frequenza, fase] | N = punti della tabella | beach = spiaggia (unità)
+// PONTE (`bridge` sulla mappa): l'unico passaggio sul mare. a = direzione (radianti, y in giù), w = larghezza, len = lunghezza.
+// ----------------------------------------------------------------------------
+function makeIsle(R, wob, N, beach) {
+  const I = { R, wob, N, beach, r: new Float32Array(N), min: Infinity, max: 0 };
+  for (let k = 0; k < N; k++) {
+    const a = k / N * Math.PI * 2;
+    let f = 1;
+    for (const w of wob) f += w[0] * Math.sin(a * w[1] + w[2]);
+    const r = I.r[k] = R * f;
+    if (r < I.min) I.min = r;
+    if (r > I.max) I.max = r;
+  }
+  return I;
+}
+function isleAt(I, a) { const k = ((a < 0 ? a + Math.PI * 2 : a) / (Math.PI * 2) * I.N) | 0; return I.r[k % I.N]; }
+function makeBridge(I, a, w, len) { return { a, w, len, ux: Math.cos(a), uy: Math.sin(a), r0: isleAt(I, a) }; }
+
+// SICILIA (ISLAND): circa 30 s di cammino dal centro alla spiaggia. Il ponte parte in alto a sinistra (nord-ovest).
+const ISLAND = makeIsle(4200, [[0.07, 3, 0.5], [0.05, 5, 2.1], [0.025, 11, 1.0], [0.012, 23, 4.0]], 512, 46);
+MAPS.cripta.isle = ISLAND;
+MAPS.cripta.bridge = makeBridge(ISLAND, -Math.PI * 0.75, 64, 620);
+// GOAT: andando molto in alto in Sicilia c'è una figura nera gigantesca (il doppio di un boss). Per ora non fa niente: sta lì.
+//   x, y = dove sta (i piedi) | r = ingombro (non la attraversi) | scale = quanto è grande rispetto a un boss
+MAPS.cripta.goat = { name: 'Goat', x: 0, y: -3150, r: 120, scale: 2 };
+
+// raggio della costa della mappa in corso nella direzione di (x, y)
+function islandR(x, y) { return isleAt(G.map.isle, Math.atan2(y, x)); }
+// tiene (x, y) almeno `margin` dentro la costa. Scrive in _isl (x, y, hit). Veloce se lontano dal mare.
+const _isl = { x: 0, y: 0, hit: false };
+function islandClamp(x, y, margin) {
+  _isl.x = x; _isl.y = y; _isl.hit = false;
+  const d2 = x * x + y * y, lim0 = G.map.isle.min - margin;
+  if (d2 < lim0 * lim0) return _isl;
+  const lim = islandR(x, y) - margin, d = Math.sqrt(d2);
+  if (d <= lim) return _isl;
+  _isl.x = x / d * lim; _isl.y = y / d * lim; _isl.hit = true;
+  return _isl;
+}
+// punto di spawn finito in mare: si specchia dall'altra parte del player (verso l'interno), se serve si riporta a riva
+function islandSpawn(x, y) {
+  const c = islandClamp(x, y, 30);
+  if (!c.hit) return c;
+  return islandClamp(2 * Player.x - x, 2 * Player.y - y, 30);
+}
+
+// ----------------------------------------------------------------------------
+// LO SCOGLIO DI SCILLA — un'isoletta raggiungibile solo dal ponte della Sicilia. Ci vive Scilla, un boss enorme e resistentissimo.
+// Entrando il ponte si chiude alle spalle: si torna in Sicilia solo dopo averla battuta.
+// Battuta la prima volta: l'Aruspice legge un TERZO omen su ogni oggetto (Save.data.reef).
+//   delay = secondi prima che arrivi | hp / dmg = moltiplicatori sopra il guardiano maggiore (b3) | boss = aspetto e attacchi
+// ----------------------------------------------------------------------------
+const REEF = {
+  name: 'Lo Scoglio di Scilla',
+  delay: 2.5, hp: 6, dmg: 1.5,
+  boss: { name: 'Scilla', art: 'medusa', sprite: 'boss_medusa', bullet: 'eb_red', burst: 30, arms: 4, speed: 1.2, summon: 'elite', every: 9, n: 2 },
+};
+REEF.isle = makeIsle(820, [[0.06, 4, 1.0], [0.03, 9, 2.0]], 256, 40);
+// la mappa dello Scoglio: come la Sicilia (nemici, boss della modalità infinita) ma pavimento di pietra bruciata, niente rovine.
+// Il suo ponte (il ritorno) sta a sud-est, dalla parte della Sicilia.
+const REEF_MAP = Object.assign({}, MAPS.cripta, {
+  name: REEF.name, short: 'Scoglio', floor: 'dite', props: ['pl_dry_tuft', 'pl_dry_fern'], obstacle: 'o_sarc', obstacles: 0, layout: null,
+  isle: REEF.isle, bridge: makeBridge(REEF.isle, Math.PI * 0.25, 64, 260), reef: true, goat: null,
+});
+
+// ----------------------------------------------------------------------------
 // SBLOCCHI SEGRETI — resisti fino a `time` (secondi) su `map`: in pratica in modalità infinita, dopo la vittoria.
 // Restano sbloccati per sempre (Save.data.unlocks). L'arma segreta ha `secret: <id>` in WEAPON_DEFS.
 // ----------------------------------------------------------------------------
 const UNLOCKS = {
-  wisps:    { map: 'cripta', time: 660, name: 'Linguae Ignis', kind: 'Arma segreta', hint: "resisti fino all'11:00 nella Cripta",
+  wisps:    { map: 'cripta', time: 660, name: 'Linguae Ignis', kind: 'Arma segreta', hint: "resisti fino all'11:00 in Sicilia",
               desc: 'Ora può uscire nelle carte del level up.' },
-  teleport: { map: 'palude', time: 660, name: 'Teletrasporto', kind: 'Abilità', hint: "resisti fino all'11:00 nella Palude",
+  teleport: { map: 'palude', time: 660, name: 'Teletrasporto', kind: 'Abilità', hint: "resisti fino all'11:00 in Sardegna",
               desc: 'Tasto E (sul telefono il tasto TELE): ti sposta di colpo di qualche passo dove vai.' },
   facile:   { map: 'cattedrale', time: 660, name: 'Modalità Facile', kind: 'Modalità', hint: "resisti fino all'11:00 nella Cattedrale",
               desc: 'Solo nel Cocito: la scegli dalla scheda della mappa. Facile per modo di dire: dannati 10 volte più forti.' },

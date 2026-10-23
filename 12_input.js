@@ -21,8 +21,8 @@ const Input = {
   JOY_DEAD: 6,
   JOY_MODES: { float: 'Mobile: appare dove tocchi', left: 'Fisso in basso a sinistra', right: 'Fisso in basso a destra' },
   stageW: 0, stageH: 0,
-  dashReq: false, _lastTap: 0,  // doppio tocco = scatto
   teleReq: false,               // tasto TELE (telefono) = teletrasporto
+  skillReq: null,               // tasti IRA / GELO (telefono): 'ira' | 'gelo'
 
   joyMode() { return (Save.data && Save.data.settings.joy) || 'float'; },
 
@@ -64,10 +64,6 @@ const Input = {
       if (e.pointerType === 'touch' && !this.isTouch) { this.isTouch = true; if (typeof onTouchDetected === 'function') onTouchDetected(); }
       const r = el.getBoundingClientRect();
       this.stageW = r.width; this.stageH = r.height;
-      // doppio tocco veloce sul campo = SCATTO
-      const now = performance.now();
-      if (e.pointerType !== 'mouse' && now - this._lastTap < 300) this.dashReq = true;
-      this._lastTap = now;
       j.active = true; j.id = e.pointerId;
       j.x = e.clientX - r.left; j.y = e.clientY - r.top;
       if (this.joyMode() === 'float') { j.sx = j.x; j.sy = j.y; }

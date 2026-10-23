@@ -62,6 +62,19 @@ const MapGen = {
         c.obs.push({ x, y, r: m.obsR, spr: m.obstacle });
       }
     }
+    // isole: niente rovine né piante in mare o sulla spiaggia
+    if (m.isle) {
+      const I = m.isle, inside = (x, y, mg) => x * x + y * y < (I.min - mg) * (I.min - mg) || Math.sqrt(x * x + y * y) < isleAt(I, Math.atan2(y, x)) - mg;
+      c.props = c.props.filter((p) => inside(p.x, p.y, I.beach + 20));
+      c.obs = c.obs.filter((o) => inside(o.x, o.y, I.beach + 30));
+      c.plats = c.plats.filter((p) => inside(p.x, p.y, I.beach + 30) && inside(p.x + p.w, p.y + p.h, I.beach + 30));
+    }
+    // Goat: attorno alla figura nera niente rovine né piante
+    if (m.goat) {
+      const g = m.goat, far = (x, y) => (x - g.x) * (x - g.x) + (y - g.y) * (y - g.y) > 360 * 360;
+      c.props = c.props.filter((p) => far(p.x, p.y)); c.obs = c.obs.filter((o) => far(o.x, o.y));
+      c.plats = c.plats.filter((p) => far(p.x + p.w / 2, p.y + p.h / 2));
+    }
     // accampamento del Magister: lo spiazzo attorno resta sgombro
     const MC = MAGISTER_CAMP;
     if (this.mapId === MC.map) c.obs = c.obs.filter((o) => (o.x - MC.x) * (o.x - MC.x) + (o.y - MC.y) * (o.y - MC.y) > MC.clearR * MC.clearR);

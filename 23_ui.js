@@ -34,16 +34,7 @@ const UI = {
       const dx = e.clientX - sx; sx = null;
       if (Math.abs(dx) > 30) this.action(dx < 0 ? 'map-next' : 'map-prev');
     });
-    // tasto SCATTO (telefono): risponde al tocco subito, anche con l'altro dito sul joystick
-    const db = $('dashbtn');
-    db.addEventListener('pointerdown', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      Sfx.unlock();
-      if (G.state === 'play') Input.dashReq = true;
-      db.classList.add('hit'); setTimeout(() => db.classList.remove('hit'), 120);
-    });
-    db.addEventListener('contextmenu', (e) => e.preventDefault());
-    // tasto TELE (telefono, solo dopo lo sblocco del teletrasporto)
+    // tasto TELE (telefono, solo dopo lo sblocco del teletrasporto): risponde al tocco subito, anche con l'altro dito sul joystick
     const tb = $('telebtn');
     tb.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -52,10 +43,16 @@ const UI = {
       tb.classList.add('hit'); setTimeout(() => tb.classList.remove('hit'), 120);
     });
     tb.addEventListener('contextmenu', (e) => e.preventDefault());
-    // suggerimenti a rotazione nel menu
-    this.tipIdx = (Math.random() * TIPS.length) | 0;
-    this.showMenuTip();
-    setInterval(() => { if (G.state === 'menu') this.nextMenuTip(); }, 9000);
+    // tasti delle ABILITÀ (IRA, GELO)
+    document.querySelectorAll('.skbtn').forEach((b) => {
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        Sfx.unlock();
+        if (G.state === 'play') Input.skillReq = b.dataset.skill;
+        b.classList.add('hit'); setTimeout(() => b.classList.remove('hit'), 120);
+      });
+      b.addEventListener('contextmenu', (e) => e.preventDefault());
+    });
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -83,7 +80,6 @@ const UI = {
       case 'continue': continueEndless(); break;
       case 'reroll': this.reroll(); break;
       case 'chest-close': this.closeChest(); break;
-      case 'tip-next': this.nextMenuTip(); break;
       case 'map-prev': this.stepMap(-1); break;
       case 'map-next': this.stepMap(1); break;
       case 'mode-incubo': case 'mode-facile': this.setMode(a.slice(5)); break;
@@ -101,15 +97,44 @@ const UI = {
     }
   },
 
+  // LA MORTE: il suo ritratto a tutto schermo per `secs` secondi (arriva al minuto 14)
+  reaper(secs) {
+    const el = $('reaper');
+    el.classList.remove('show'); void el.offsetWidth;   // riparte l'animazione
+    el.classList.add('show');
+    clearTimeout(this._reaperT);
+    this._reaperT = setTimeout(() => el.classList.remove('show'), secs * 1000);
+  },
+
+  // tasto TELE: frecce schivate (x / 50), poi TELE+ potenziato
+  refreshDodges() {
+    const d = Save.data.dodges, up = d >= TELE_UP.dodges;
+    if (d === this._dodges) return;
+    this._dodges = d;
+    $('tele-n').textContent = up ? 'MAX' : d + '/' + TELE_UP.dodges;
+    $('tele-label').textContent = up ? 'TELE+' : 'TELE';
+    $('telebtn').classList.toggle('up', up);
+  },
+
+  // tasti delle abilità: visibili solo se sbloccate (Player.skill), dal lato opposto al joystick fisso
+  refreshSkills() {
+    const bc = document.body.classList, left = Save.data.settings.joy === 'right';
+    for (const id in SKILLS) {
+      bc.toggle('has-' + id, !!Player.skill[id]);
+      $('sk-' + id).classList.toggle('left', left);
+    }
+  },
+
   // mostra/nasconde i pannelli in base allo stato
   applyState(s) {
-    // classe sul body con lo stato (es. il tasto SCATTO si vede solo in partita)
+    // classe sul body con lo stato (es. il tasto TELE si vede solo in partita)
     const bc = document.body.classList;
     for (const c of Array.from(bc)) if (c.indexOf('st-') === 0) bc.remove(c);
     bc.add('st-' + s);
-    $('dashbtn').classList.toggle('left', Save.data.settings.joy === 'right');
     $('telebtn').classList.toggle('left', Save.data.settings.joy === 'right');
     bc.toggle('has-tele', Save.unlocked('teleport'));
+    this.refreshDodges();
+    this.refreshSkills();
     $('m-menu').classList.toggle('show', s === 'menu');
     $('m-records').classList.toggle('show', s === 'records');
     $('m-shop').classList.toggle('show', s === 'shop');
@@ -227,14 +252,6 @@ const UI = {
     g.fillStyle = vg; g.fillRect(0, 0, W, H);
     return (this._thumbs[id] = c.toDataURL());
   },
-
-  // suggerimenti ("Lo sapevi che...") a rotazione nel menu
-  showMenuTip() {
-    const el = $('menu-tip-text');
-    el.textContent = TIPS[this.tipIdx % TIPS.length];
-    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
-  },
-  nextMenuTip() { this.tipIdx = (this.tipIdx + 1) % TIPS.length; this.showMenuTip(); },
 
   // riga del salvataggio in fondo al menu
   refreshMenuSave() {
@@ -423,7 +440,7 @@ const UI = {
     weapons:  { tab: 'items',   title: "Bottega dell'Armaiolo",  ico: 'it_dagger',  say: '"Arma virumque cano."' },
     armor:    { tab: 'items',   title: 'Bottega del Corazzaio',  ico: 'it_shield',  say: '"Si vis pacem, para bellum."' },
     smith:    { tab: 'smith',   title: 'Fucina del Fabbro',      ico: 'ico_anvil',  say: '"Labor omnia vincit improbus."' },
-    inn:      { tab: 'chars',   title: 'Locanda',                ico: 'ico_mug',    say: '"Fatti non foste a viver come bruti."' },
+    inn:      { tab: 'traits',  title: 'Locanda',                ico: 'ico_mug',    say: '"Fatti non foste a viver come bruti, ma per seguir virtute e canoscenza."' },
     board:    { tab: 'quests',  title: 'Tabula',                 ico: 'board',      say: '"Fortes fortuna adiuvat."' },
     magister: { tab: 'mastery', title: 'Schola del Magister',    ico: 'ico_book',   say: '"Nulla dies sine linea."' },
     magister_away: { tab: 'away', title: 'Schola del Magister',  ico: 'ico_book',   say: '"Torno subito." — c\'è scritto sulla porta.' },
@@ -505,13 +522,9 @@ const UI = {
     } else if (this.shopTab === 'away') {
       // il Magister non c'è più: è sceso nella Cattedrale (MAGISTER_CAMP)
       const open = Save.mapUnlocked(MAGISTER_CAMP.map);
-      h = '<div class="hint" style="padding:10px;line-height:1.5">"Sono sceso a studiare tra le rovine della ' + MAPS[MAGISTER_CAMP.map].name.replace(/^La /, '') +
-        '. Chi cerca i miei studi o le ricette di fusione parta da lì e cammini verso destra, più o meno un minuto: seguite la lanterna."<br>— il Magister' +
-        (open ? '' : '<br><br>(La ' + MAPS[MAGISTER_CAMP.map].short + ' si apre vincendo ' + MAPS[MAPS[MAGISTER_CAMP.map].unlock].name.replace(/^La /, 'la ') + '.)') + '</div>';
+      h = '<div class="hint" style="padding:10px;line-height:1.5">"' + MAPS[MAGISTER_CAMP.map].short + '. A destra. La lanterna."<br>— il Magister</div>';
     } else if (this.shopTab === 'mastery') {
       // RICETTE DI FUSIONE: si comprano una volta sola; poi in partita arriva il Custode (TRIAL), battuto = sbloccata per sempre
-      h += '<div class="hint" style="margin:2px 0 4px">Ricette di fusione: si comprano una volta sola. In partita arriva il loro Custode: battilo e la fusione è tua per sempre. ' +
-        'Con le due armi al massimo (Lv 5 o evolute) esce la carta FUSIONE: un posto libero, +' + Math.round((FUSION.dmg - 1) * 100) + '% danno, ricarica più breve.</div>';
       for (const k in FUSION_SPECIAL) {
         const sp = FUSION_SPECIAL[k], ids = k.split('+'), st = Save.recipeState(k);
         const pair = WEAPON_DEFS[ids[0]].name + ' + ' + WEAPON_DEFS[ids[1]].name;
@@ -543,7 +556,7 @@ const UI = {
         any = true;
         const list = Save.omenList(id), off = it.gear && id !== gear;
         let lines = '';
-        for (let k = 0; k < OMENS.slots; k++) {
+        for (let k = 0; k < Save.omenSlots(); k++) {
           const o = list[k];
           if (o) {
             const R = OMENS.rarity[o.r], K = OMENS.kinds[o.k];
@@ -582,14 +595,22 @@ const UI = {
       h = this.shopUpBar('smith') + '<div class="stonebar"><div class="check' + (this.useStone ? ' on' : '') + (st > 0 ? '' : ' off') + '" id="use-stone"><i></i><span>Usa una Pietra del Fabbro (+' +
         Math.round(STONE.bonus * 100) + '% di successo)</span></div><span class="stones"><img src="' + SPR.url.stone + '">' + st + '</span></div>' + h;
     } else {
-      for (const id in CHARACTERS) {
-        const c = CHARACTERS[id], has = d.chars.indexOf(id) >= 0, sel = d.char === id;
-        h += '<div class="srow' + (has ? '' : ' locked') + (sel ? ' sel' : '') + '"><div class="simg sunken"><img src="' + SPR.url[c.sprite] + '"></div>' +
-          '<div><span class="sname">' + c.name + '</span><div class="sdesc">' + c.desc + '</div></div>' +
-          (sel ? '<button class="btn" disabled>In uso</button>'
-               : has ? '<button class="btn" data-buy="pick" data-id="' + id + '">Scegli</button>'
-                     : '<button class="btn" data-buy="char" data-id="' + id + '"' + (d.coins < c.price ? ' disabled' : '') + '>Sblocca ' + this.price(c.price) + '</button>') +
-          '</div>';
+      // LOCANDA: potenziamenti permanenti di Eek (TRAITS) + le abilità e come si sbloccano
+      for (const id in TRAITS) {
+        const t = TRAITS[id], L = Save.traitLevel(id), max = L >= t.costs.length, cost = Save.traitCost(id);
+        let pips = '';
+        for (let k = 0; k < t.costs.length; k++) pips += '<i class="' + (k < L ? 'on' : '') + '"></i>';
+        h += '<div class="srow trow"><div class="simg sunken"><img src="' + SPR.url[t.icon] + '"></div>' +
+          '<div><span class="sname">' + t.name + '</span> <span class="uppips">' + pips + '</span>' +
+          '<div class="sdesc">' + (L ? t.fmt(L) : 'Niente, per ora.') + (max ? '' : ' → ' + t.fmt(L + 1)) + '</div></div>' +
+          (max ? '<button class="btn" disabled>Al massimo</button>'
+               : '<button class="btn" data-buy="trait" data-id="' + id + '"' + (d.coins < cost ? ' disabled' : '') + '>Compra ' + this.price(cost) + '</button>') + '</div>';
+      }
+      for (const id in SKILLS) {
+        const k = SKILLS[id], open = Save.skillOpen(id);
+        h += '<div class="srow skrow' + (open ? '' : ' locked') + '"><div class="simg sunken"><b class="sklbl">' + k.label + '</b></div>' +
+          '<div><span class="sname">' + k.name + '</span><div class="sdesc">' + (open ? k.desc : 'Abilità: si sblocca vincendo ' + MAPS[k.win].name + '.') + '</div></div>' +
+          '<button class="btn" disabled>' + (open ? 'Sbloccata' : 'Bloccata') + '</button></div>';
       }
     }
     P.innerHTML = h;
@@ -647,11 +668,8 @@ const UI = {
       if (r === 'ok') { Sfx.play('anvil'); this.shopMsg('Colpo perfetto! ' + name + ' +' + L + '.', 'ok'); }
       else if (r === 'fail') { Sfx.play('crack'); this.shopMsg('Il ferro si è incrinato... ' + name + ' resta a +' + L + '.', 'bad'); }
       else if (r === 'broken') { Sfx.play('crack'); this.shopMsg('Crack! ' + name + ' si è rotto.', 'bad'); }
-    } else if (kind === 'char') {
-      if (Save.buyChar(id)) { Sfx.play('buy'); this.shopMsg(CHARACTERS[id].name + ' sbloccato e selezionato!', 'ok'); }
-    } else if (kind === 'pick') {
-      Save.data.char = id; Save.write();
-      this.shopMsg(CHARACTERS[id].name + ' selezionato.', 'ok');
+    } else if (kind === 'trait') {
+      if (Save.buyTrait(id)) { if (G.scene === 'run') Player.recalcStats(); Sfx.play('quest'); this.shopMsg(TRAITS[id].name + ' Lv ' + Save.traitLevel(id) + ': ' + TRAITS[id].fmt(Save.traitLevel(id)) + '.', 'ok'); }
     }
     this.renderShop();
   },
@@ -791,20 +809,20 @@ const UI = {
       if (sec !== this._sec) { this._sec = sec; this._clock = ''; $('t-clock').textContent = fmtTime(sec); }
     }
 
-    // tasto SCATTO: anello di ricarica
+    // tasti TELE e abilità: anello di ricarica
     if (G.state === 'play' && Input.isTouch) {
-      const dcd = (Player.kunai ? DASH.cdEek : DASH.cd) * Player.cdMult;
-      const r = Player.dashCd > 0 ? Math.max(0, Math.min(1, 1 - Player.dashCd / dcd)) : 1;
-      const q = Math.round(r * 40) / 40;
-      if (q !== this._dashQ) {
-        this._dashQ = q;
-        const b = $('dashbtn');
-        b.style.setProperty('--cd', q);
-        b.classList.toggle('ready', q >= 1);
+      for (const id in SKILLS) {
+        if (!Player.skill[id]) continue;
+        const c = Player.skillCd[id], q = c > 0 ? Math.round(Math.max(0, Math.min(1, 1 - c / Player.skillCdMax(id))) * 40) / 40 : 1;
+        if (q !== this['_skQ' + id]) {
+          this['_skQ' + id] = q;
+          const b = $('sk-' + id);
+          b.style.setProperty('--cd', q);
+          b.classList.toggle('ready', q >= 1);
+        }
       }
-      // tasto TELE: stesso anello di ricarica
       if (Player.tele) {
-        const tcd = TELEPORT.cd * Player.cdMult;
+        const tcd = Player.teleCdMax();
         const rt = Player.teleCd > 0 ? Math.max(0, Math.min(1, 1 - Player.teleCd / tcd)) : 1, qt = Math.round(rt * 40) / 40;
         if (qt !== this._teleQ) {
           this._teleQ = qt;
@@ -846,7 +864,7 @@ const UI = {
     S.fast = on === undefined ? !S.fast : !!on;
     Save.write();
     this.syncFast();
-    if (G.state === 'play') this.toast('Velocità', S.fast ? 'x2: il tempo corre al doppio.' : 'x1: velocità normale.', 1.5);
+    if (G.state === 'play') this.toast(S.fast ? 'x2' : 'x1', '', 1.2);
   },
   syncFast() { const b = $('fastbtn'); if (b) b.classList.toggle('on', !!Save.data.settings.fast); },
 
@@ -864,8 +882,9 @@ const UI = {
     if (!important && now < this._toastHold) { this._toastNext = [title, msg, secs]; return; }
     this._toastHold = important ? now + (secs || 4) * 1000 : 0;
     $('toast-title').textContent = title;
-    $('toast-msg').textContent = msg;
+    $('toast-msg').textContent = msg || '';
     const el = $('toast');
+    el.classList.toggle('bare', !msg);   // senza testo: solo il nome
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     clearTimeout(this._toastTimer);
     this._toastTimer = setTimeout(() => {
@@ -911,7 +930,16 @@ const UI = {
     $('d-weapons').querySelectorAll('.wn').forEach((el, k) => { el.textContent = ws[k].name; });
     const r = Save.data.records[G.mapId + '/' + G.diffId];
     let rec = record ? 'NUOVO RECORD per ' + G.map.short + '!' : 'Record su questa mappa: ' + fmtTime(r ? (r.endless || r.t) : 0);
-    if (victory) rec = 'Mappa completata!' + (unlocked ? ' Hai sbloccato: ' + unlocked + '.' : '') + ' Bonus vittoria: +' + WIN.reward.coins * G.diff.coin + ' monete. Se continui, arrivano subito i due guardiani della mappa, e al minuto 10 tutti e tre i boss.';
+    if (victory) rec = 'Mappa completata!' + (unlocked ? ' Hai sbloccato: ' + unlocked + '.' : '') + ' +' + WIN.reward.coins * G.diff.coin + ' monete.';
+    if (G.cheat) rec = 'Partita coi trucchi del debug: non conta (niente monete, record, sblocchi né missioni).';
+    // presa dalla MORTE (minuto 14): il suo ritratto sopra al titolo
+    const reaped = G.killedBy === 'death' && !victory;
+    $('m-dead').classList.toggle('reaped', reaped);
+    $('end-reaper').hidden = !reaped;
+    if (reaped) {
+      $('end-title').innerHTML = '<span class="w">LA</span> <span class="r">MORTE</span>';
+      sub.textContent = 'La Morte ha preso ' + ch.name + ' a ';
+    }
     $('d-record').textContent = rec;
     $('d-quests').hidden = true;
   },
@@ -994,27 +1022,3 @@ function weaponRows() {
   return out;
 }
 function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
-
-// Suggerimenti ("Lo sapevi che...")
-const TIPS = [
-  'Le armi sparano da sole: tu pensa a muoverti, schivare e raccogliere le gemme. Ogni livello ti fa scegliere 1 potenziamento su 3.',
-  'SCATTO: premi Spazio (sul telefono il tasto SCATTO in basso, o doppio tocco) per uno scatto velocissimo in cui nessuno ti può colpire.',
-  'Le monete restano salvate tra una partita e l\'altra. Spendile nel Villaggio: Armaiolo, Corazzaio, Fabbro e Locanda.',
-  'Un\'arma al livello 5 + la passiva giusta = EVOLUZIONE. La carta della passiva ti dice quali armi fa evolvere.',
-  'Gli Arcieri tendono l\'arco prima di tirare: quando la linea di mira diventa bianca, scansati di lato o mettiti dietro una colonna. Una freccia fa malissimo.',
-  'Non ti piacciono le 3 carte? RILANCIA (tasto R): 3 rilanci a partita.',
-  'Sul telefono il joystick appare dove tocchi. Se preferisci un joystick fisso, cambialo dalle Opzioni.',
-  'In pausa (tasto II in alto a destra) vedi la tua build: danno fatto da ogni arma e tutte le statistiche.',
-  'I Cacciatori (slime rossi con le corna) a volte lasciano un forziere: dentro ci sono 1 o 3 potenziamenti gratis.',
-  'Resisti 7 minuti per vincere la mappa e sbloccare la successiva. Poi puoi continuare: arrivano subito i due guardiani della mappa, al minuto 10 tutti e tre i boss.',
-  'La Bacheca nel Villaggio ha delle missioni: completale e torna a riscuotere le monete.',
-  'Di notte gli slime diventano demoni: più veloci e più cattivi. Resta nella luce e non farti circondare.',
-  'Il Fabbro può sempre fallire. Una Pietra del Fabbro (la lasciano i boss) aggiunge +30% di riuscita.',
-  'Si gioca solo a Incubo: slime più veloci e cattivi, ma ogni moneta vale x5.',
-  'Dalle Opzioni puoi esportare un codice di salvataggio per portare i progressi su un altro dispositivo.',
-  'Il Magister ha lasciato il Villaggio: lo trovi nella Cattedrale Sconsacrata, camminando verso destra per circa un minuto. Vende gli studi delle passive e le ricette di fusione.',
-  'Solo cinque coppie di armi si fondono. Il Magister vende le ricette, una volta sola: poi in partita batti il loro Custode e la fusione è tua per sempre.',
-  'Con una fusione sbloccata e le sue due armi al massimo esce la carta FUSIONE: nasce una terza arma che occupa un posto solo. Le coppie sono nel Record.txt.',
-  'Il bottone x2 accanto alla pausa (o il tasto F) fa correre la partita al doppio della velocità. Ripremilo per tornare normale.',
-  'Alcune cose non si comprano: si guadagnano resistendo a lungo dopo la vittoria. Nel Record.txt trovi i SEGRETI ancora da sbloccare.',
-];

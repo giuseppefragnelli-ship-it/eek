@@ -27,8 +27,12 @@ const Player = {
   invT: 0,         // invulnerabilità residua dopo un colpo
   slowT: 0,        // gambe congelate (Traditore Gelido)
   throwT: 0,       // fotogramma del lancio (kunai)
-  dashT: 0, dashCd: 0, dashX: 1, dashY: 0,   // SCATTO: durata residua, ricarica, direzione
   tele: false, teleCd: 0,                    // TELETRASPORTO: sbloccato (UNLOCKS.teleport), ricarica
+  teleUp: false,                             // teletrasporto potenziato (TELE_UP: 50 frecce schivate)
+  teleInvT: 0,                               // invulnerabilità data dal teletrasporto (una freccia presa qui = schivata)
+  magicPow: 1, magicCd: 1,                   // Magia della Locanda (abilità)
+  skill: { ira: false, gelo: false },        // ABILITÀ sbloccate (SKILLS: vinci Dite / Cocito)
+  skillCd: { ira: 0, gelo: 0 },              // ricarica residua
   trailN: 0, trailX: new Float32Array(8), trailY: new Float32Array(8), trailT: new Float32Array(8), trailF: new Int8Array(8),
   level: 1, xp: 0, xpNext: CFG.xpToNext(1),
   weapons: [],     // { id, def, level, evolved, timer, burst, burstT, angle, targets }
@@ -38,8 +42,10 @@ const Player = {
     this.x = this.y = this.px = this.py = 0;
     this.facing = 1; this.view = 'f'; this.idleT = 0; this.hurtT = 0; this.invT = 0;
     this.dirX = 1; this.dirY = 0; this.lungeT = 0; this.slowT = 0; this.throwT = 0;
-    this.dashT = 0; this.dashCd = 0; this.trailN = 0;
+    this.trailN = 0; this.teleInvT = 0; this.onBridge = false;
     this.tele = Save.unlocked('teleport'); this.teleCd = 0;
+    this.teleUp = this.tele && Save.data.dodges >= TELE_UP.dodges;
+    for (const id in SKILLS) { this.skill[id] = Save.skillOpen(id); this.skillCd[id] = 0; }
     this.level = 1; this.xp = 0; this.xpNext = CFG.xpToNext(1);
     this.weapons.length = 0;
     this.passives.length = 0;
@@ -66,18 +72,21 @@ const Player = {
     const P = PASSIVE_DEFS, L = (id) => this.passiveLevel(id) * Save.masteryMult(id), O = (k) => Save.omen(k);
     const oldMax = this.maxHp;
     const ch = CHARACTERS[Save.data.char] || CHARACTERS.eek;
-    // passive della partita + oggetti del negozio + personaggio
-    this.dmgMult  = 1 + P.might.per * L('might') + ch.dmg + O('dmg');
+    // passive della partita + oggetti del negozio + personaggio + Locanda (T = TRAITS)
+    const T = (id, k) => Save.trait(id, k);
+    this.dmgMult  = 1 + P.might.per * L('might') + ch.dmg + O('dmg') + T('forza', 'dmg');
     this.speed    = CFG.player.speed * (1 + P.speed.per * L('speed') + Save.itemValue('boots') + ch.speed + O('speed'));
-    this.maxHp    = CFG.player.hp + P.maxhp.per * L('maxhp') + Save.itemValue('necklace') + ch.hp + O('hp');
+    this.maxHp    = CFG.player.hp + P.maxhp.per * L('maxhp') + Save.itemValue('necklace') + ch.hp + O('hp') + T('vita', 'hp');
+    this.magicPow = 1 + T('magia', 'power');    // Magia: potenza delle abilità
+    this.magicCd  = 1 - T('magia', 'cd');       // Magia: ricarica delle abilità
     this.armor    = Save.itemValue('shield') + P.armor.per * L('armor') + O('armor');
     this.regen    = P.regen.per * L('regen') + (ch.regen || 0) + O('regen');
     this.magnet   = CFG.player.magnet * (1 + P.magnet.per * L('magnet') + O('magnet'));
     this.xpMult   = 1 + P.xp.per * L('xp') + (ch.xp || 0) + Save.itemValue('ring') + O('xp');
-    this.cdMult   = Math.max(0.4, 1 - P.cooldown.per * L('cooldown') - O('cd'));
+    this.cdMult   = Math.max(0.4, 1 - P.cooldown.per * L('cooldown') - O('cd') - T('destrezza', 'cd'));
     this.areaMult = 1 + (ch.area || 0) + P.area.per * L('area') + O('area');
     this.amount   = P.amount.per * L('amount');
-    this.dodge    = Math.min(0.6, (ch.dodge || 0) + Save.itemValue('cloak') + O('dodge'));
+    this.dodge    = Math.min(0.6, (ch.dodge || 0) + Save.itemValue('cloak') + O('dodge') + T('destrezza', 'dodge'));
     this.coinMult = 1 + P.greed.per * L('greed') + O('coin');
     if (this.maxHp > oldMax && oldMax > 0) this.hp += this.maxHp - oldMax; // la vita guadagnata si riempie subito
   },
@@ -89,30 +98,30 @@ const Player = {
     let spd = this.speed;
     if (this.slowT > 0) { this.slowT -= dt; spd *= FROST.slow; }
     if (this.throwT > 0) this.throwT -= dt;
-    if (this.dashCd > 0) this.dashCd -= dt;
     if (this.teleCd > 0) this.teleCd -= dt;
-    // copie sbiadite dello scatto: invecchiano
+    if (this.teleInvT > 0) this.teleInvT -= dt;
+    if (this.skillCd.ira > 0) this.skillCd.ira -= dt;
+    if (this.skillCd.gelo > 0) this.skillCd.gelo -= dt;
+    // copie sbiadite del teletrasporto: invecchiano
     for (let k = 0; k < this.trailN; k++) this.trailT[k] -= dt;
     while (this.trailN > 0 && this.trailT[0] <= 0) { this.trailN--; for (let k = 0; k < this.trailN; k++) { this.trailX[k] = this.trailX[k + 1]; this.trailY[k] = this.trailY[k + 1]; this.trailT[k] = this.trailT[k + 1]; this.trailF[k] = this.trailF[k + 1]; } }
-    if (this.dashT > 0) {
-      // SCATTO: corsa velocissima in linea retta
-      this.dashT -= dt;
-      this.x += this.dashX * DASH.speed * dt;
-      this.y += this.dashY * DASH.speed * dt;
-      if (this.trailN < 8) { const k = this.trailN++; this.trailX[k] = this.x; this.trailY[k] = this.y; this.trailT[k] = 0.3; this.trailF[k] = this.facing; }
-      if (this.dashT <= 0) this.endDash();
-    } else {
-      this.x += ax * spd * dt;
-      this.y += ay * spd * dt;
-    }
+    this.x += ax * spd * dt;
+    this.y += ay * spd * dt;
     if (this.moving) { const l = Math.sqrt(ax * ax + ay * ay); this.dirX = ax / l; this.dirY = ay / l; }
     // ostacoli della mappa: ci scivoli attorno
     if (Obs.n > 0) { const pp = pushOutOfObstacles(this.x, this.y, this.r); if (pp.hit) { this.x = pp.x; this.y = pp.y; } }
+    // isole: il mare non si attraversa (nemmeno col teletrasporto: si atterra sulla spiaggia), tranne sul ponte
+    if (G.map.isle) this.shore();
+    // Goat (Sicilia): non la attraversi
+    const gt = G.map.goat;
+    if (gt) {
+      const gx = this.x - gt.x, gy = this.y - gt.y, rr = gt.r + this.r, g2 = gx * gx + gy * gy;
+      if (g2 < rr * rr) { const d = Math.sqrt(g2) || 1; this.x = gt.x + gx / d * rr; this.y = gt.y + gy / d * rr; }
+    }
     if (ax > 0) this.facing = 1; else if (ax < 0) this.facing = -1;
     // vista: conta l'asse dominante (in diagonale prevale il lato, così si vede la corsa di profilo)
-    if (this.moving || this.dashT > 0) {
-      const mx = this.moving ? ax : this.dashX, my = this.moving ? ay : this.dashY;
-      this.view = Math.abs(my) > Math.abs(mx) * 1.3 ? (my > 0 ? 'f' : 'b') : 's';
+    if (this.moving) {
+      this.view = Math.abs(ay) > Math.abs(ax) * 1.3 ? (ay > 0 ? 'f' : 'b') : 's';
       this.idleT = 0;
     } else if ((this.idleT += dt) > 0.6) this.view = 'f';   // fermo: si gira verso di te
     if (this.hurtT > 0) this.hurtT -= dt;
@@ -120,55 +129,102 @@ const Player = {
     if (this.regen > 0 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + this.regen * dt);
   },
 
-  // SCATTO (Spazio / doppio tocco)
-  tryDash() {
-    if (this.dashCd > 0 || this.dashT > 0 || G.state !== 'play') return;
-    const ax = Input.ax, ay = Input.ay, l = Math.sqrt(ax * ax + ay * ay);
-    this.dashX = l > 0 ? ax / l : this.dirX; this.dashY = l > 0 ? ay / l : this.dirY;
-    this.dashT = DASH.time;
-    this.dashCd = (this.kunai ? DASH.cdEek : DASH.cd) * this.cdMult;
-    this.invT = Math.max(this.invT, DASH.iframes);
-    spawnFx(FXK.PUFF, this.x, this.y + 6, 0.3, 16);
-    Sfx.play('dash');
-  },
-  // TELETRASPORTO (E/Q o il tasto TELE): sparisci e ricompari TELEPORT.dist più in là, dove stai andando
+  // TELETRASPORTO (Spazio/E/Q o il tasto TELE): sparisci e ricompari TELEPORT.dist più in là, dove stai andando
   // (fermo: nell'ultima direzione). Scavalca i nemici; se atterri su un ostacolo lo step dopo ti spinge fuori.
+  // Potenziato (TELE_UP, dopo 50 frecce schivate): più lontano, ricarica più breve e un'onda d'urto dove atterri.
   tryTeleport() {
     if (!this.tele || this.teleCd > 0 || G.state !== 'play') return;
+    const T = this.teleUp ? TELE_UP : TELEPORT;
     const ax = Input.ax, ay = Input.ay, l = Math.sqrt(ax * ax + ay * ay);
-    const dx = l > 0 ? ax / l : this.dirX, dy = l > 0 ? ay / l : this.dirY, D = TELEPORT.dist;
+    const dx = l > 0 ? ax / l : this.dirX, dy = l > 0 ? ay / l : this.dirY, D = T.dist * (1 + (this.magicPow - 1) * 0.5);   // Magia: un po' più lontano
     spawnFx(FXK.PUFF, this.x, this.y + 4, 0.35, 18);
-    // copie sbiadite lungo il salto (la stessa scia dello scatto)
+    // copie sbiadite lungo il salto
     this.trailN = 0;
-    for (let k = 0; k < TELEPORT.ghosts && k < 8; k++) {
-      const f = k / TELEPORT.ghosts;
+    for (let k = 0; k < T.ghosts && k < 8; k++) {
+      const f = k / T.ghosts;
       this.trailX[k] = this.x + dx * D * f; this.trailY[k] = this.y + dy * D * f;
       this.trailT[k] = 0.12 + 0.2 * f; this.trailF[k] = this.facing;
       this.trailN++;
     }
-    this.dashT = 0;
     this.x += dx * D; this.y += dy * D;
     this.px = this.x; this.py = this.y;   // niente interpolazione: sparisce e ricompare
     this.dirX = dx; this.dirY = dy;
     if (dx > 0.2) this.facing = 1; else if (dx < -0.2) this.facing = -1;
-    this.teleCd = TELEPORT.cd * this.cdMult;
-    this.invT = Math.max(this.invT, TELEPORT.iframes);
+    this.teleCd = this.teleCdMax();
+    this.invT = Math.max(this.invT, T.iframes); this.teleInvT = T.iframes;
     spawnFx(FXK.RING, this.x, this.y, 0.3, 36);
     spawnFx(FXK.PUFF, this.x, this.y + 4, 0.3, 14);
+    if (this.teleUp) {   // onda d'urto all'arrivo: danno e spinta a chi ti aspettava
+      spawnFx(FXK.RING, this.x, this.y, 0.45, T.blastR);
+      damageArea(this.x, this.y, T.blastR, T.blastDmg * this.dmgMult * this.magicPow * CFG.enemyHpMult(G.time), T.blastKb);
+      addShake(3);
+    }
     Sfx.play('tele');
   },
-  endDash() {
-    if (!this.kunai) return;
-    // Eek: ventaglio di kunai nella direzione dello scatto
-    const a0 = Math.atan2(this.dashY, this.dashX), n = DASH.kunai, w = findWeapon('dart');
-    G.src = w;
-    for (let k = 0; k < n; k++) {
-      const a = a0 + (k - (n - 1) / 2) * DASH.spread;
-      spawnProjectile(PK.SALT, this.x, this.y, Math.cos(a), Math.sin(a), 560, DASH.kunaiDmg * this.dmgMult, 6, 1, 0.8, 2, 60);
+  // ISOLE: tieni a riva; sul PONTE (G.map.bridge) puoi camminare sul mare, stretto tra i parapetti.
+  // In fondo al ponte: dalla Sicilia si entra nello Scoglio di Scilla, dallo Scoglio (dopo averla battuta) si torna.
+  onBridge: false,
+  shore() {
+    const B = G.map.bridge;
+    if (B) {
+      let t = this.x * B.ux + this.y * B.uy, lat = -this.x * B.uy + this.y * B.ux;
+      if (this.onBridge || (t > B.r0 - 70 && lat > -B.w * 0.5 && lat < B.w * 0.5)) {
+        if (t < B.r0 - 70) this.onBridge = false;   // tornato a terra
+        else {
+          this.onBridge = true;
+          const lim = B.w * 0.5 - this.r;
+          if (lat > lim) lat = lim; else if (lat < -lim) lat = -lim;
+          // sullo Scoglio il ponte resta chiuso finché Scilla è viva
+          const end = G.map.reef && !G.reefDone ? B.r0 - 20 : B.r0 + B.len;
+          if (t > end) { t = end; if (G.map.reef && !G.reefDone && !G.reefWarned) { G.reefWarned = true; UI.toast('Ponte sbarrato', '', 2); } }
+          this.x = B.ux * t - B.uy * lat; this.y = B.uy * t + B.ux * lat;
+          if (t > B.r0 + B.len - 24) { if (G.map.reef) leaveReef(); else enterReef(); }
+          return;
+        }
+      }
     }
-    G.src = null;
-    this.throwT = 0.18;
-    Sfx.play('bow');
+    const c = islandClamp(this.x, this.y, this.r + 4);
+    if (c.hit) { this.x = c.x; this.y = c.y; }
+  },
+  // posto sul ponte, `back` unità prima della fine (si arriva da lì)
+  placeOnBridge(back) {
+    const B = G.map.bridge, t = B.r0 + B.len - back;
+    this.x = this.px = B.ux * t; this.y = this.py = B.uy * t;
+    this.dirX = -B.ux; this.dirY = -B.uy; this.onBridge = true; this.trailN = 0;
+  },
+  teleCdMax() { return (this.teleUp ? TELE_UP.cd : TELEPORT.cd) * this.cdMult * this.magicCd; },
+
+  // ABILITÀ (SKILLS): si sbloccano vincendo Dite (Ira) e Cocito (Gelo). Tasti 1/2 (o Z/X), sul telefono i tasti sopra al TELE.
+  // La Magia della Locanda le rende più forti (magicPow) e le ricarica prima (magicCd).
+  skillCdMax(id) { return SKILLS[id].cd * this.magicCd; },
+  trySkill(id) {
+    const K = SKILLS[id];
+    if (!this.skill[id] || this.skillCd[id] > 0 || G.state !== 'play') return;
+    this.skillCd[id] = this.skillCdMax(id);
+    const pw = this.magicPow, dmg = K.dmg * this.dmgMult * pw * CFG.enemyHpMult(G.time), r = K.r * (1 + (pw - 1) * 0.5);
+    if (id === 'ira') {
+      // IRA DI DITE: le mura infuocate esplodono attorno a te — danno e spinta forte
+      spawnFx(FXK.NOVA, this.x, this.y, 0.55, r);
+      spawnFx(FXK.RING, this.x, this.y, 0.4, r * 0.6);
+      damageArea(this.x, this.y, r, dmg, K.kb);
+      addShake(6);
+      Sfx.play('boom');
+    } else {
+      // GELO DI COCITO: tutto ciò che è vicino resta congelato (fermo) per qualche secondo
+      const E = Enemies, n = Grid.query(this.x, this.y, r + CFG.MAX_ENEMY_R, QBUF_SKILL), t = K.time * pw;
+      for (let k = 0; k < n; k++) {
+        const j = QBUF_SKILL[k];
+        if (E.alive[j] === 0) continue;
+        const ex = E.x[j] - this.x, ey = E.y[j] - this.y;
+        if (ex * ex + ey * ey > r * r) continue;
+        E.frz[j] = t; E.frzM[j] = 0;
+      }
+      spawnFx(FXK.RING, this.x, this.y, 0.6, r);
+      spawnFx(FXK.NOVA, this.x, this.y, 0.4, r * 0.5);
+      damageArea(this.x, this.y, r, dmg, 0);
+      Sfx.play('frost');
+    }
+    this.invT = Math.max(this.invT, 0.3);
   },
 
   // fotogramma da disegnare (animazione del personaggio)
@@ -177,7 +233,7 @@ const Player = {
     const C = SPR.cache, b = this.anim, v = this.view === 'f' ? b : b + '_' + this.view;
     const f = (s) => C[v + s] || C[b + s] || C[b];   // se manca la vista, ripiega sul fronte
     if (this.throwT > 0) return f('_t');
-    if (this.moving || this.dashT > 0) return f('_r' + (((rt * 9) | 0) & 3));
+    if (this.moving) return f('_r' + (((rt * 9) | 0) & 3));
     const i = ((rt * 2.6) | 0) & 3;                    // respiro lento su 4 fotogrammi
     return i ? f('_i' + i) : (C[v] || C[b]);
   },
@@ -213,7 +269,7 @@ const Player = {
 
   gainCoins(n) {
     G.runCoins += n;
-    Save.addCoins(n);
+    if (!G.cheat) Save.addCoins(n);   // coi trucchi del debug le monete non vanno in banca
   },
 };
 
@@ -260,7 +316,7 @@ function pickUp(i) {
   } else if (k === GK.STONE) {
     Save.data.stones = (Save.data.stones || 0) + 1; Save.write();
     Sfx.play('chest');
-    UI.toast('Oggetto trovato', 'Pietra del Fabbro', 3);
+    UI.toast('Pietra del Fabbro', '', 3);
   } else if (k === GK.VACUUM) {
     // attira tutte le gemme XP e le monete della mappa
     for (let j = 0; j < M.count; j++) {

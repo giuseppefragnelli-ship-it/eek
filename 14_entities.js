@@ -90,7 +90,8 @@ const FX = new Pool(CFG.MAX_FX, [
 const FXK = { BOLT: 0, BOOM: 1, SPLAT: 2, NUM: 3, SLASH: 4, PUFF: 5, RING: 6, THRUST: 7, SPARK: 8, WHIP: 9, NOVA: 10, FLARE: 11, GLINT: 12 };   // GLINT = impatto dorato degli Strali di Giove   // FLARE = scoppio di Linguae Ignis
 
 // Proiettili dei nemici (palle di melma degli Sputacchini, raffiche del boss finale) + pozze di veleno (kind 2)
-const EShots = new Pool(CFG.MAX_ESHOTS, ['alive', 'kind', 'x', 'y', 'px', 'py', 'vx', 'vy', 'life', 'dmg', 'r']);
+// near: frecce degli Arcieri, 1 = ti è passata vicino (DODGE.r), 2 = già contata come schivata
+const EShots = new Pool(CFG.MAX_ESHOTS, ['alive', 'kind', 'x', 'y', 'px', 'py', 'vx', 'vy', 'life', 'dmg', 'r', 'near']);
 // Pozze acide (Fiala Acida): danno a intervalli a chi ci sta dentro
 const Zones = new Pool(CFG.MAX_ZONES, ['alive', 'x', 'y', 'r', 'life', 'life0', 'tick', 'dmg', 'slow', 'src']);
 const GK = { XP: 0, COIN: 1, HEAL: 2, VACUUM: 3, STONE: 4, CHEST: 5 }; // tipi di oggetti a terra (pool Gems)
@@ -99,6 +100,7 @@ const GK = { XP: 0, COIN: 1, HEAL: 2, VACUUM: 3, STONE: 4, CHEST: 5 }; // tipi d
 const QBUF_PROJ = new Int32Array(1024);
 const QBUF_SEP = new Int32Array(256);
 const QBUF_PLAYER = new Int32Array(512);
+const QBUF_SKILL = new Int32Array(4096);   // Gelo di Cocito: raggio grande
 const ENEMY_REMAP = new Int32Array(CFG.MAX_ENEMIES);
 
 // ---------------------------------------------------------------------------
@@ -143,18 +145,21 @@ const G = {
 function spawnEnemy(type, x, y) {
   const i = Enemies.spawn();
   if (i < 0) return -1;
+  // dal minuto 11 qualunque dannato nasce teschio (anche gli sciami e i servi dei boss)
+  if (G.time >= SKULLS.time && G.scene === 'run' && !ENEMY_DEFS[type].boss) type = ET.skull;
   const d = ENEMY_DEFS[type];
   const E = Enemies;
   E.alive[i] = 1;
   E.uid[i] = G.nextUid++;
   E.type[i] = type;
+  if (G.map.isle && G.scene === 'run') { const p = islandSpawn(x, y); x = p.x; y = p.y; }   // isole: mai in mare
   E.x[i] = E.px[i] = x;
   E.y[i] = E.py[i] = y;
   const late = !d.boss && G.time >= LATE.time;   // dal minuto 10 gli slime sono più forti
   E.hp[i] = E.maxHp[i] = d.hp * (d.boss ? CFG.bossHpMult(G.time) : CFG.enemyHpMult(G.time)) * G.diff.hp * G.map.hp * (late ? LATE.hp : 1);
   E.r[i] = d.r;
-  E.speed[i] = d.speed * G.diff.speed * (0.9 + Math.random() * 0.2) * (late ? LATE.speed : 1);
-  E.dmg[i] = d.dmg * CFG.enemyDmgMult(G.time) * G.diff.dmg * G.map.dmg * (late ? LATE.dmg : 1);
+  E.speed[i] = d.speed * G.diff.speed * (0.9 + Math.random() * 0.2) * (late ? LATE.speed : 1) * (d.boss ? 1 : (G.map.mobSpeed || 1));
+  E.dmg[i] = d.dmg * CFG.enemyDmgMult(G.time) * G.diff.dmg * G.map.dmg * (late ? LATE.dmg : 1) * (d.boss ? 1 : (G.map.mobDmg || 1));
   E.mass[i] = d.mass;
   E.xp[i] = d.xp;
   E.phase[i] = Math.random() * 6.283;
@@ -212,6 +217,14 @@ function killEnemy(i) {
   }
   const cc = d.coin * G.diff.coin * G.map.coin * Player.coinMult * (type === ET.elite ? 1 : CFG.coinDecay(G.time));
   if (Math.random() < cc) spawnGem(x + 6, y - 4, 1, GK.COIN);
+  // COLPO DI FORTUNA (Sicilia): raramente un dannato esplode in una pioggia di monete
+  const J = G.map.jackpot;
+  if (J && Math.random() < J.chance) {
+    const nc = J.coins[0] + ((Math.random() * (J.coins[1] - J.coins[0] + 1)) | 0);
+    for (let k = 0; k < nc; k++) { const a = Math.random() * 6.283, r = 10 + Math.random() * 70; spawnGem(x + Math.cos(a) * r, y + Math.sin(a) * r, 1, GK.COIN); }
+    spawnFx(FXK.RING, x, y, 0.5, 90); addShake(3); Sfx.play('chest');
+    UI.toast('Fortuna', '+' + nc, 3);
+  }
   const rare = E.type[i] === ET.heavy ? 3 : 1;
   if (Math.random() < CFG.drops.heal * rare) spawnGem(x - 6, y + 4, CFG.drops.healAmount, GK.HEAL);
   else if (Math.random() < CFG.drops.vacuum * rare) spawnGem(x - 6, y + 4, 0, GK.VACUUM);

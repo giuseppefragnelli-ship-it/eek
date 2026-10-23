@@ -7,11 +7,14 @@
 function updateNight() {
   const t = G.time;
   let night = false;
-  if (t >= NIGHT.start) night = ((t - NIGHT.start) % NIGHT.cycle) >= NIGHT.cycle - NIGHT.nightLen;
+  if (t >= NIGHT.forever) {
+    night = true;
+    if (!G.eternal) { G.eternal = true; UI.toast('Nox aeterna', '', 3, true); Sfx.play('night'); }
+  } else if (t >= NIGHT.start) night = ((t - NIGHT.start) % NIGHT.cycle) >= NIGHT.cycle - NIGHT.nightLen;
   if (night !== G.night) {
     G.night = night;
-    if (night) { UI.toast('Nox', '"Lo giorno se n\'andava, e l\'aere bruno..."', 4); Sfx.play('night'); }
-    else UI.toast('Aurora', '"Dolce color d\'orïental zaffiro."', 3);
+    if (night) { UI.toast('Nox', '', 2); Sfx.play('night'); }
+    else UI.toast('Aurora', '', 2);
   }
   // il buio arriva e se ne va in NIGHT.fade secondi (lo usa solo il disegno)
   const k = CFG.DT / NIGHT.fade;
@@ -37,6 +40,7 @@ function updateEnemies(dt) {
   const nightSpd = G.night ? NIGHT.speedMult : 1;
   const ELITE_T = ET.elite, SPITTER_T = ET.spitter, TOXIC_T = ET.toxic, GHOST_T = ET.ghost, LUPA_T = ET.lupa, FURIA_T = ET.furia, hasObs = Obs.n > 0;
   const nearX = G.viewW * 0.6, t = G.time;
+  const island = !!G.map.isle, isl2 = island ? (G.map.isle.min - CFG.MAX_ENEMY_R) * (G.map.isle.min - CFG.MAX_ENEMY_R) : 0;
   // CALORE: la separazione (ogni slime controlla i vicini) era quasi tutto il costo della simulazione.
   // Ora si calcola a turni: metà degli slime a ogni passo, un quarto per quelli fuori schermo.
   const tick = G.sepTick = ((G.sepTick | 0) + 1) & 1023, farSepX = G.viewW * 0.55, farSepY = G.viewH * 0.55;
@@ -46,7 +50,11 @@ function updateEnemies(dt) {
     if (E.flash[i] > 0) E.flash[i] -= dt;
     if (E.atkCd[i] > 0) E.atkCd[i] -= dt;
     if (E.orbCd[i] > 0) E.orbCd[i] -= dt;
-    if (E.big[i] !== 0) { updateBoss(i, dt); continue; }
+    if (E.big[i] !== 0) {
+      updateBoss(i, dt);
+      if (island && E.alive[i] !== 0) { const c = islandClamp(X[i], Y[i], R[i] * 0.4); X[i] = c.x; Y[i] = c.y; }
+      continue;
+    }
     let spd = E.speed[i] * nightSpd;
     if (E.slowT[i] > 0) { E.slowT[i] -= dt; spd *= slowFactor; }
 
@@ -60,6 +68,7 @@ function updateEnemies(dt) {
         p.x = px + Input.ax * (G.viewW * 0.5 + 40) + (Math.random() - 0.5) * G.viewW * 0.6 * Math.abs(Input.ay);
         p.y = py + Input.ay * (G.viewH * 0.5 + 40) + (Math.random() - 0.5) * G.viewH * 0.6 * Math.abs(Input.ax);
       }
+      if (island) { const q = islandSpawn(p.x, p.y); p.x = q.x; p.y = q.y; }
       X[i] = E.px[i] = p.x; Y[i] = E.py[i] = p.y;
       continue;
     }
@@ -173,6 +182,8 @@ function updateEnemies(dt) {
     E.kx[i] *= kbDecay; E.ky[i] *= kbDecay;
     // ostacoli: gli slime ci scivolano attorno
     if (hasObs && E.type[i] !== GHOST_T && !(offScreen && ((i + tick) & 1))) { const pp = pushOutOfObstacles(X[i], Y[i], ri * 0.8); if (pp.hit) { X[i] = pp.x; Y[i] = pp.y; } }
+    // Sicilia: anche i dannati restano a riva (il confronto veloce scarta chi è lontano dal mare)
+    if (island && X[i] * X[i] + Y[i] * Y[i] > isl2) { const c = islandClamp(X[i], Y[i], ri); X[i] = c.x; Y[i] = c.y; }
   }
 }
 
@@ -215,11 +226,35 @@ function updateEShots(dt) {
     }
     S.x[i] += S.vx[i] * dt; S.y[i] += S.vy[i] * dt;
     if (Obs.n > 0 && pointInObstacle(S.x[i], S.y[i])) { S.alive[i] = 0; spawnFx(FXK.PUFF, S.x[i], S.y[i], 0.2, 8); continue; } // le colonne fanno da riparo
-    const dx = S.x[i] - px, dy = S.y[i] - py, rr = S.r[i] + pr - 2;
-    if (dx * dx + dy * dy < rr * rr) {
+    const dx = S.x[i] - px, dy = S.y[i] - py, rr = S.r[i] + pr - 2, d2 = dx * dx + dy * dy;
+    if (d2 < rr * rr) {
       S.alive[i] = 0;
+      if (S.kind[i] === 4 && Player.teleInvT > 0) countDodge(S.x[i], S.y[i]);   // passata attraverso durante il teletrasporto: schivata
       Player.hurt(S.dmg[i]);
       if (G.state !== 'play') return;
+      continue;
+    }
+    // FRECCE SCHIVATE: una freccia che ti passa vicino e poi si allontana senza colpirti
+    if (S.kind[i] === 4 && S.near[i] !== 2 && Player.tele) {
+      if (S.near[i] === 0) { if (d2 < DODGE.r * DODGE.r) S.near[i] = 1; }
+      else if (dx * S.vx[i] + dy * S.vy[i] > 0) { S.near[i] = 2; countDodge(S.x[i], S.y[i]); }
     }
   }
+}
+
+// una freccia schivata: conto per sempre (Save.data.dodges); a TELE_UP.dodges il teletrasporto si potenzia
+function countDodge(x, y) {
+  if (G.cheat || !Player.tele) return;
+  const d = ++Save.data.dodges;
+  spawnFx(FXK.GLINT, x, y, 0.3, 10);
+  if (d === TELE_UP.dodges) {
+    Player.teleUp = true;
+    Save.write();
+    spawnFx(FXK.RING, Player.x, Player.y, 0.6, 160);
+    Sfx.play('quest');
+    UI.toast('TELE+', '', 4, true);
+  } else if (d < TELE_UP.dodges && d % 10 === 0) {
+    UI.toast('Frecce schivate', d + ' / ' + TELE_UP.dodges, 2);
+  }
+  UI.refreshDodges();
 }

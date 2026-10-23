@@ -32,11 +32,14 @@ const Save = {
       arcana: 0,            // vecchio Arcanum [?]: rimborsato in monete e azzerato da normalize
       recipes: {},          // ricette di fusione (FUSION_SPECIAL): chiave -> 1 comprata (Custode da battere) | 2 sbloccata
       unlocks: {},          // sblocchi segreti (UNLOCKS): id -> true
+      dodges: 0,            // frecce degli Arcieri schivate col teletrasporto (a TELE_UP.dodges si potenzia)
+      traits: {},           // Locanda: forza / destrezza / vita / magia -> livello (TRAITS)
+      reef: 0,              // volte che hai battuto Scilla (REEF): da 1 in su l'Aruspice legge 3 omina per oggetto
       fusions: {},          // fusioni uniche già scoperte (FUSION_SPECIAL): chiave -> true
       wins: {},             // mappe vinte: id -> true
       map: 'cripta',        // mappa scelta
       savedAt: 0,           // ms dell'ultimo salvataggio (per scegliere il più recente tra telefono e PC)
-      migr: 3,              // versione dei dati salvati
+      migr: 4,              // versione dei dati salvati
       gear: 'dagger',       // arma dell'Armaiolo che porti in partita
       shops: { weapons: 0, armor: 0, smith: 0 },   // livello delle botteghe
       mastery: {},          // Magister: passiva -> grado (0..3)
@@ -65,6 +68,10 @@ const Save = {
     for (const id in d.items) if (!SHOP_ITEMS[id]) delete d.items[id];
     d.mastery = d.mastery || {}; d.omens = d.omens || {};
     d.unlocks = d.unlocks && typeof d.unlocks === 'object' ? d.unlocks : {};
+    d.dodges = Math.max(0, d.dodges | 0);
+    d.reef = Math.max(0, d.reef | 0);
+    d.traits = d.traits && typeof d.traits === 'object' ? d.traits : {};
+    for (const k in d.traits) if (!TRAITS[k]) delete d.traits[k]; else d.traits[k] = Math.max(0, Math.min(TRAITS[k].costs.length, d.traits[k] | 0));
     d.fusions = d.fusions && typeof d.fusions === 'object' ? d.fusions : {};
     d.recipes = d.recipes && typeof d.recipes === 'object' ? d.recipes : {};
     for (const k in d.recipes) if (!FUSION_SPECIAL[k] || (d.recipes[k] !== 1 && d.recipes[k] !== 2)) delete d.recipes[k];
@@ -81,6 +88,8 @@ const Save = {
     if (d.migr < 2) { d.chars = d.chars.filter((c) => c !== 'vagabondo'); if (d.char === 'vagabondo') d.char = 'eek'; d.migr = 2; }
     // v3: statistiche di carriera (partono dai record che c'erano già)
     if (d.migr < 3) { d.stats.kills = Math.max(d.stats.kills, d.bestKills || 0); d.tips.intro = d.runs > 0; d.migr = 3; }
+    // v4: resta solo Eek: i personaggi comprati tornano monete
+    if (d.migr < 4) { const refund = { alchimista: 1, badessa: 15, fuochista: 20 }; for (const c of d.chars) d.coins = (d.coins || 0) + (refund[c] || 0); d.chars = ['eek']; d.char = 'eek'; d.migr = 4; }
     if (d.chars.indexOf('eek') < 0) d.chars.unshift('eek');
     if (!CHARACTERS[d.char] || d.chars.indexOf(d.char) < 0) d.char = 'eek';
     if (!MAPS[d.map] || !this.mapUnlocked(d.map, d)) d.map = 'cripta';
@@ -258,14 +267,20 @@ const Save = {
   },
 
   // ---- Aruspice --------------------------------------------------------------
-  omenList(id) { const o = this.data.omens[id]; return o || [null, null]; },
+  // posti per gli omina di ogni oggetto: 2, oppure 3 dopo aver battuto Scilla (REEF)
+  omenSlots() { return this.data && this.data.reef > 0 ? 3 : OMENS.slots; },
+  omenList(id) {
+    const o = (this.data.omens[id] || []).slice(0, this.omenSlots());
+    while (o.length < this.omenSlots()) o.push(null);
+    return o;
+  },
   omenKinds(id) {
     const want = SHOP_ITEMS[id].gear ? 'w' : 'a', out = [];
     for (const k in OMENS.kinds) { const on = OMENS.kinds[k].on; if (on === want || on === '*') out.push(k); }
     return out;
   },
-  _rollOmen(id, avoid) {
-    let kinds = this.omenKinds(id).filter((k) => k !== avoid);
+  _rollOmen(id, avoid) {   // avoid = tipi già presenti negli altri posti dello stesso oggetto
+    let kinds = this.omenKinds(id).filter((k) => avoid.indexOf(k) < 0);
     const k = kinds[(Math.random() * kinds.length) | 0];
     let t = Math.random() * 100, r = 0;
     for (; r < OMENS.rarity.length - 1; r++) { t -= OMENS.rarity[r].w; if (t < 0) break; }
@@ -274,17 +289,18 @@ const Save = {
     v = K.int ? Math.max(1, Math.round(v)) : Math.round(v * 1000) / 1000;
     return { k, v, r };
   },
-  omenReadCost(id) { const n = this.omenList(id).filter(Boolean).length; return n < OMENS.slots ? OMENS.read[n] : 0; },
+  omenReadCost(id) { const n = this.omenList(id).filter(Boolean).length; return n < this.omenSlots() ? OMENS.read[n] : 0; },
   // legge l'omen nel primo posto libero (slot < 0) oppure rilegge lo slot indicato
   readOmen(id, slot) {
     if (this.itemLevel(id) < 0) return null;
-    const list = this.omenList(id).slice();
+    const list = this.omenList(id);
     if (slot < 0) slot = list.indexOf(null);
-    if (slot < 0 || slot >= OMENS.slots) return null;
+    if (slot < 0 || slot >= this.omenSlots()) return null;
     const cost = list[slot] ? OMENS.reroll : this.omenReadCost(id);
     if (!this.spend(cost)) return null;
-    const other = list[1 - slot];
-    list[slot] = this._rollOmen(id, other ? other.k : null);
+    const avoid = [];
+    for (let k = 0; k < list.length; k++) if (k !== slot && list[k]) avoid.push(list[k].k);
+    list[slot] = this._rollOmen(id, avoid);
     this.data.omens[id] = list;
     this.data.stats.omens = (this.data.stats.omens || 0) + 1;
     this.write();
@@ -304,9 +320,17 @@ const Save = {
     return t;
   },
 
-  buyChar(id) {
-    if (this.data.chars.indexOf(id) >= 0 || !this.spend(CHARACTERS[id].price)) return false;
-    this.data.chars.push(id); this.data.char = id; this.write();
+  // abilità (SKILLS): sbloccata vincendo la sua mappa
+  skillOpen(id) { return !!(this.data && this.data.wins[SKILLS[id].win]); },
+
+  // ---- Locanda: potenziamenti permanenti (TRAITS) ---------------------------------
+  traitLevel(id) { return (this.data && this.data.traits[id]) | 0; },
+  trait(id, k) { return this.traitLevel(id) * (TRAITS[id][k] || 0); },   // es. trait('forza', 'dmg') = bonus danno totale
+  traitCost(id) { const L = this.traitLevel(id), c = TRAITS[id].costs; return L < c.length ? c[L] : 0; },
+  buyTrait(id) {
+    const c = this.traitCost(id);
+    if (!c || !this.spend(c)) return false;
+    this.data.traits[id] = this.traitLevel(id) + 1; this.write();
     return true;
   },
 

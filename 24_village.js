@@ -8,7 +8,7 @@
 //   Fabbro      -> rafforza gli oggetti
 //   Armaiolo    -> armi
 //   Corazzaio   -> armature e gioielli
-//   Locandiera  -> personaggi
+//   Locandiera  -> potenziamenti permanenti (Forza, Destrezza, Vita, Magia)
 //   Bacheca     -> missioni
 // Sotto la piazza ci sono due giardini; in fondo al sentiero il portale.
 //
@@ -289,7 +289,7 @@ const Camp = {
     const C = MAGISTER_CAMP, dx = Player.x - C.x, dy = Player.y - C.y, d2 = dx * dx + dy * dy;
     const near = d2 < C.talkR * C.talkR;
     if (near !== this.near) { this.near = near; UI.runPrompt(near); }
-    if (!this.seen && d2 < C.hintR * C.hintR) { this.seen = true; UI.toast(G.map.name, 'Una lanterna brilla tra le rovine, più a destra...', 5); }
+    if (!this.seen && d2 < C.hintR * C.hintR) this.seen = true;
   },
 
   talk() {

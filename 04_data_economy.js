@@ -71,8 +71,8 @@ const QUESTS = [
   { id: 'surv10',  cat: 'iter',   name: 'Decem minuta',        desc: 'Resisti 10 minuti.',                   reward: 5,  check: (d) => d.bestTime >= 600,    prog: (d) => [Math.floor(d.bestTime / 60), 10] },
   { id: 'runs10',  cat: 'iter',   name: 'Peregrinus',          desc: 'Scendi 10 volte.',                     reward: 3,  check: (d) => d.runs >= 10, prog: (d) => [d.runs, 10] },
   { id: 'runs50',  cat: 'iter',   name: 'Viator',              desc: 'Scendi 50 volte.',                     reward: 10, check: (d) => d.runs >= 50, prog: (d) => [d.runs, 50] },
-  { id: 'win1',    cat: 'iter',   name: 'Fine della cripta',   desc: 'Vinci la Cripta.',                     reward: 8,  check: (d) => !!d.wins.cripta },
-  { id: 'palude',  cat: 'iter',   name: 'Bonifica',            desc: 'Vinci la Palude Marcia.',              reward: 10, check: (d) => !!d.wins.palude },
+  { id: 'win1',    cat: 'iter',   name: 'Terra ferma',         desc: 'Vinci la Sicilia.',                      reward: 8,  check: (d) => !!d.wins.cripta },
+  { id: 'palude',  cat: 'iter',   name: 'Bonifica',            desc: 'Vinci la Sardegna.',                   reward: 10, check: (d) => !!d.wins.palude },
   { id: 'catt',    cat: 'iter',   name: 'Sconsacrata',         desc: 'Vinci la Cattedrale Sconsacrata.',     reward: 15, check: (d) => !!d.wins.cattedrale },
   { id: 'selva',   cat: 'iter',   name: 'Nel mezzo del cammin',desc: 'Vinci la Selva Oscura.',               reward: 18, check: (d) => !!d.wins.selva },
   { id: 'dite',    cat: 'iter',   name: 'Le mura di Dite',     desc: 'Vinci la Città di Dite.',              reward: 22, check: (d) => !!d.wins.dite },
@@ -91,7 +91,7 @@ const QUESTS = [
   { id: 'omen1',   cat: 'ars',    name: 'Haruspicina',         desc: 'Fatti leggere un omen.',               reward: 3,  check: (d) => (d.stats.omens || 0) >= 1 },
   { id: 'omen20',  cat: 'ars',    name: 'Extispicium',         desc: 'Leggi 20 omina.',                      reward: 8,  check: (d) => (d.stats.omens || 0) >= 20, prog: (d) => [d.stats.omens || 0, 20] },
   { id: 'omendiv', cat: 'ars',    name: 'Signum divinum',      desc: 'Un omen Divinum.',                     reward: 10, check: (d) => _hasDivine(d) },
-  { id: 'chars',   cat: 'ars',    name: 'Locanda piena',       desc: 'Sblocca tutti i personaggi.',          reward: 10, check: (d) => Object.keys(CHARACTERS).every((c) => d.chars.indexOf(c) >= 0) },
+  { id: 'trait3',  cat: 'ars',    name: 'Hospitium',           desc: 'Un potenziamento della Locanda a Lv 3.', reward: 15, check: (d) => Object.keys(d.traits || {}).some((k) => d.traits[k] >= 3) },
   // GLORIA
   { id: 'lv30',    cat: 'gloria', name: 'Ascensio',            desc: 'Livello 30 in una discesa.',           reward: 5,  check: (d) => d.bestLevel >= 30, prog: (d) => [d.bestLevel, 30] },
   { id: 'lv60',    cat: 'gloria', name: 'Apotheosis',          desc: 'Livello 60 in una discesa.',           reward: 12, check: (d) => d.bestLevel >= 60, prog: (d) => [d.bestLevel, 60] },
@@ -114,8 +114,8 @@ const ARCANUM = { name: 'Arcanum [?]', price: 15 };
 // ARUSPICE — omina: bonus casuali su armi e armature (2 per oggetto). Le armi contano solo se equipaggiate.
 // rarità: 0 Vulgare, 1 Rarum, 2 Divinum
 const OMENS = {
-  slots: 2,
-  read: [5, 9],          // costo per leggere il 1° e il 2° omen di un oggetto
+  slots: 2,              // posti per oggetto (3 dopo aver battuto Scilla: Save.omenSlots)
+  read: [5, 9, 16],      // costo per leggere il 1°, 2° e 3° omen di un oggetto
   reroll: 4,             // costo per rileggere un omen
   rarity: [
     { name: 'Vulgare', w: 70, m: 1.0, col: '#a49dbd' },
@@ -144,16 +144,25 @@ function scaleDesc(desc, mult) {
   return desc.replace(/(\d+(?:\.\d+)?)/, (m) => { const v = parseFloat(m) * mult; return String(Math.round(v * 100) / 100); });
 }
 
-// PERSONAGGI — arma di partenza + un'abilità unica
+// PERSONAGGI — per ora si gioca solo con Eek (Virgilio, Beatrice e Farinata tolti il 2026-10-23).
 // dodge = probabilità di schivare un colpo | xp = bonus esperienza | regen = vita/s | area = bonus area armi
 const CHARACTERS = {
   eek:        { name: 'Eek',          sprite: 'hi_eek',         weapon: 'dart', price: 0,  hp: 0,   speed: 0.03,  dmg: 0,    dodge: 0.12, xp: 0,    regen: 0,   area: 0,
                 anim: 'hi_eek', kunai: true,
-                desc: 'Kunai · schivata 12%' },
-  alchimista: { name: 'Virgilio',     sprite: 'player',         weapon: 'dart', price: 1,  hp: 0,   speed: 0,     dmg: 0,    dodge: 0,    xp: 0.15, regen: 0,   area: 0,
-                desc: '"Tu se\' lo mio maestro e \'l mio autore." · Sagitta · +15% esperienza' },
-  badessa:    { name: 'Beatrice',     sprite: 'char_badessa',   weapon: 'aura', price: 15, hp: 20,  speed: -0.05, dmg: 0,    dodge: 0,    xp: 0,    regen: 0.3, area: 0,
-                desc: '"Amor mi mosse, che mi fa parlare." · Limbus · +20 vita, +0.3 vita/s, -5% velocità' },
-  fuochista:  { name: 'Farinata',     sprite: 'char_fuochista', weapon: 'bomb', price: 20, hp: -10, speed: 0,     dmg: 0.10, dodge: 0,    xp: 0,    regen: 0,   area: 0.15,
-                desc: '"Ed el s\'ergea col petto e con la fronte." · Ignis · +10% danno, +15% area, -10 vita' },
+                desc: 'Schivata 12%' },
+};
+
+// LOCANDA — potenziamenti PERMANENTI di Eek (la Locandiera non vende più personaggi). Molto costosi.
+//   costs[L] = prezzo per passare dal livello L al L+1 (max = costs.length)
+//   forza: +dmg danno | destrezza: -cd ricarica delle armi e +dodge schivata | vita: +hp vita massima
+//   magia: abilità (teletrasporto, Ira di Dite, Gelo di Cocito) più forti di `power` e con ricarica più breve di `cd`
+const TRAITS = {
+  forza:     { name: 'Forza',     icon: 'ico_might', costs: [60, 120, 200, 320, 500], dmg: 0.08,
+               fmt: (L) => '+' + Math.round(L * 8) + '% danno' },
+  destrezza: { name: 'Destrezza', icon: 'ico_dart',  costs: [60, 120, 200, 320, 500], cd: 0.04, dodge: 0.02,
+               fmt: (L) => '-' + Math.round(L * 4) + '% ricarica armi, +' + Math.round(L * 2) + '% schivata' },
+  vita:      { name: 'Vita',      icon: 'ico_heart', costs: [50, 100, 170, 270, 420], hp: 15,
+               fmt: (L) => '+' + L * 15 + ' vita massima' },
+  magia:     { name: 'Magia',     icon: 'ico_beam',  costs: [80, 150, 250, 380, 600], power: 0.12, cd: 0.08,
+               fmt: (L) => 'abilità +' + Math.round(L * 12) + '% potenza, -' + Math.round(L * 8) + '% ricarica' },
 };

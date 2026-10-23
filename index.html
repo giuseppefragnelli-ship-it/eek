@@ -3,14 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Slime Survivors 98</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<title>S98</title>
+<!-- WEB APP: aggiunto alla Home dell'iPhone si apre a schermo intero, con la sua icona, e funziona offline (sw.js) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="S98">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="stylesheet" href="game.css" charset="utf-8">
 </head>
 <body>
 <!--
-  SLIME SURVIVORS 98 — dove sta cosa
+  S98 — dove sta cosa
   game.css                        tutto l'aspetto (tema Windows 98, telefono)
   monsters.png                    mostri e boss disegnati (atlas)
   I file JS si caricano in quest'ordine e condividono le stesse variabili globali
@@ -48,7 +56,7 @@
 <div id="ui">
   <!-- icone sul "desktop" (solo nel menu) -->
   <div id="desktop">
-    <div class="dicon" data-act="play"><img data-spr="player"><span>Slime Survivors.exe</span></div>
+    <div class="dicon" data-act="play"><img data-spr="player"><span>S98.exe</span></div>
     <div class="dicon" data-act="village"><img data-spr="h_smith"><span>Villaggio.exe</span></div>
     <div class="dicon" data-act="records"><img data-spr="ico_book"><span>Record.txt</span></div>
   </div>
@@ -65,10 +73,11 @@
       <div class="slotrow" id="pslots"></div>
     </div>
   </div>
-  <!-- SCATTO (solo touch) -->
-  <button id="dashbtn" aria-label="Scatto"><span>SCATTO</span></button>
-  <!-- TELETRASPORTO (solo touch, dopo lo sblocco: resisti fino all'11:00 nella Palude) -->
-  <button id="telebtn" aria-label="Teletrasporto"><span>TELE</span></button>
+  <!-- TELETRASPORTO (solo touch, dopo lo sblocco: resisti fino all'11:00 nella Palude) + frecce schivate (a 50: TELE+) -->
+  <button id="telebtn" aria-label="Teletrasporto"><span id="tele-label">TELE</span><i id="tele-n">0/50</i></button>
+  <!-- ABILITÀ (solo touch, dopo averle sbloccate vincendo Dite e Cocito) -->
+  <button class="skbtn" id="sk-ira" data-skill="ira" aria-label="Ira di Dite"><span>IRA</span></button>
+  <button class="skbtn" id="sk-gelo" data-skill="gelo" aria-label="Gelo di Cocito"><span>GELO</span></button>
   <!-- VILLAGGIO -->
   <div id="vbar" hidden></div>
   <div id="vprompt"><button class="btn default" data-act="talk"><span id="vprompt-text"></span></button></div>
@@ -83,10 +92,13 @@
     <div class="tmsg"><div class="tico">!</div><div id="toast-msg"></div></div>
   </div>
 
+  <!-- LA MORTE (minuto 14): ritratto a tutto schermo per un attimo quando arriva -->
+  <div id="reaper" aria-hidden="true"><img src="death_portrait.jpg" alt=""><div class="rp-txt"><b>LA MORTE</b></div></div>
+
   <!-- MENU PRINCIPALE -->
   <div class="modal" id="m-menu">
     <div class="window menu-win">
-      <div class="titlebar"><img data-spr="slime_heavy"><span>Slime Survivors 98</span>
+      <div class="titlebar"><img data-spr="slime_heavy"><span>S98</span>
         <div class="tb-wallet"><img data-spr="coin"><b id="menu-coins" class="coins">0</b><img data-spr="stone"><b id="menu-stones" class="stonecount">0</b></div></div>
       <div class="menu-body">
         <!-- LOGO -->
@@ -94,7 +106,7 @@
           <div class="hero-slimes" aria-hidden="true">
             <img data-spr="slime_fast" class="hs hs1"><img data-spr="slime_heavy" class="hs hs2"><img data-spr="slime_spitter" class="hs hs3"><img data-spr="slime_drop" class="hs hs4"><img data-spr="slime_elite" class="hs hs5">
           </div>
-          <div class="logo-title"><span class="lt1">SLIME</span><span class="lt2">SURVIVORS</span><span class="lt98">98</span></div>
+          <div class="logo-title"><span class="lt1">S<b>98</b></span></div>
           <div class="logo-sub">per me si va ne la città dolente</div>
         </div>
 
@@ -108,7 +120,7 @@
                 <div class="char-name" id="menu-char">Eek</div>
                 <div class="char-desc" id="menu-char-desc"></div>
                 <div class="char-gear" id="menu-gear"></div>
-                <button class="btn small" data-act="chars">Cambia ›</button>
+                <button class="btn small" data-act="chars">Locanda ›</button>
               </div>
             </div>
           </section>
@@ -139,7 +151,6 @@
               <button class="btn mbtn" data-act="records"><img data-spr="ico_book">Record</button>
               <button class="btn mbtn" data-act="options"><img data-spr="ico_hourglass">Opzioni</button>
             </div>
-            <div class="menu-tip" id="menu-tip" data-act="tip-next"><img data-spr="ico_bulb"><span id="menu-tip-text"></span></div>
             <div class="menu-save"><span id="menu-save-dot" class="dot"></span><span id="menu-save"></span></div>
           </div>
         </div>
@@ -195,7 +206,7 @@
           <div class="tabs" id="shop-tabs" hidden>
             <button class="tab" data-tab="items">Oggetti</button>
             <button class="tab" data-tab="smith">Fabbro</button>
-            <button class="tab" data-tab="chars">Personaggi</button>
+            <button class="tab" data-tab="traits">Locanda</button>
           </div>
           <div class="wallet sunken"><img data-spr="coin"><b id="shop-coins" class="coins">0</b></div>
         </div>
@@ -251,6 +262,7 @@
   <!-- MORTE: "schermata fluo della morte" -->
   <div id="m-dead">
     <div class="endbox">
+      <img id="end-reaper" class="end-reaper" src="death_portrait.jpg" alt="" hidden>
       <div class="end-title" id="end-title"><span class="w">GAME</span> <span class="r">OVER</span></div>
       <div class="end-sub" id="end-sub">Eek è stato dissolto in <b id="d-time">00:00</b>.</div>
       <div class="end-panel">
@@ -305,7 +317,7 @@
   <div id="taskbar">
     <button class="btn start" id="startbtn" data-act="start"><img data-spr="slime_fast"><b>Start</b></button>
     <div class="tsep"></div>
-    <button class="btn task" id="taskbtn"><img data-spr="slime_heavy"><span>Slime Survivors 98</span></button>
+    <button class="btn task" id="taskbtn"><img data-spr="slime_heavy"><span>S98</span></button>
     <div class="tfill"></div>
     <div class="tray sunken">
       <span class="ti"><img data-spr="ico_skull"><b id="t-kills">0</b></span>
