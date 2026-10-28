@@ -523,6 +523,23 @@ const WEAPON_LOGIC = {
     }
   },
 
+  // Pioggia di Meteore: segna dannati a caso sullo schermo, dopo `fall` secondi la meteora cade lì (Meteors).
+  meteor(w, dt) {
+    updateMeteors(dt, w);
+    w.timer -= dt;
+    if (w.timer > 0) return;
+    const st = wStats(w), def = w.def;
+    w.timer = st.cd * Player.cdMult;
+    const hw = G.viewW * 0.5, hh = G.viewH * 0.5;
+    for (let s = 0; s < amt(st); s++) {
+      let tx, ty;
+      const t = randomEnemyNear(hw, hh);
+      if (t >= 0) { tx = Enemies.x[t]; ty = Enemies.y[t]; }
+      else { const a = Math.random() * 6.283, d = 80 + Math.random() * 160; tx = Player.x + Math.cos(a) * d; ty = Player.y + Math.sin(a) * d; }
+      addMeteor(tx, ty, def.fall * (1 + s * 0.12), st.dmg * Player.dmgMult, st.area * Player.areaMult, st.fire ? 1 : 0);
+    }
+  },
+
   // Granata Alchemica: lanciata su un nemico, esplode all'atterraggio.
   bomb(w, dt) {
     w.timer -= dt;
@@ -711,6 +728,30 @@ function frostNova(st) {
   }
   spawnFx(FXK.NOVA, Player.x, Player.y, 0.34, R);
   Sfx.play('frost');
+}
+
+// METEORE in volo (Pioggia di Meteore): array fissi, niente allocazioni. t = secondi all'impatto, t0 = durata della caduta.
+const Meteors = { max: 32, n: 0, x: new Float32Array(32), y: new Float32Array(32), t: new Float32Array(32), t0: new Float32Array(32),
+  dmg: new Float32Array(32), r: new Float32Array(32), fire: new Uint8Array(32) };
+function addMeteor(x, y, fall, dmg, r, fire) {
+  const M = Meteors;
+  if (M.n >= M.max) return;
+  const k = M.n++;
+  M.x[k] = x; M.y[k] = y; M.t[k] = M.t0[k] = fall; M.dmg[k] = dmg; M.r[k] = r; M.fire[k] = fire;
+}
+function updateMeteors(dt, w) {
+  const M = Meteors, def = w.def;
+  for (let k = 0; k < M.n; k++) {
+    M.t[k] -= dt;
+    if (M.t[k] > 0) continue;
+    const x = M.x[k], y = M.y[k], r = M.r[k];
+    damageArea(x, y, r, M.dmg[k], 120, 0);
+    spawnFx(FXK.BOOM, x, y, 0.4, r * 1.1);
+    spawnFx(FXK.RING, x, y, 0.35, r * 1.3);
+    if (M.fire[k]) spawnZone(x, y, r * 0.8, def.fireDur, M.dmg[k] * def.fireDmg, false);
+    Sfx.play('boom'); addShake(2.5);
+    M.n--; M.x[k] = M.x[M.n]; M.y[k] = M.y[M.n]; M.t[k] = M.t[M.n]; M.t0[k] = M.t0[M.n]; M.dmg[k] = M.dmg[M.n]; M.r[k] = M.r[M.n]; M.fire[k] = M.fire[M.n]; k--;
+  }
 }
 
 function updateWeapons(dt) {

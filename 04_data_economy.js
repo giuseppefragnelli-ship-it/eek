@@ -153,16 +153,19 @@ const CHARACTERS = {
 };
 
 // LOCANDA — potenziamenti PERMANENTI di Eek (la Locandiera non vende più personaggi). Molto costosi.
-//   costs[L] = prezzo per passare dal livello L al L+1 (max = costs.length)
+//   costs[L] = prezzo per passare dal livello L al L+1 (max = costs.length = 11 dal 2026-10-28, prima 5: vedi TRAITS_OLD)
 //   forza: +dmg danno | destrezza: -cd ricarica delle armi e +dodge schivata | vita: +hp vita massima
 //   magia: abilità (teletrasporto, Ira di Dite, Gelo di Cocito) più forti di `power` e con ricarica più breve di `cd`
+const TRAIT_COSTS = [60, 100, 160, 240, 340, 470, 630, 820, 1050, 1320, 1650];
 const TRAITS = {
-  forza:     { name: 'Forza',     icon: 'ico_might', costs: [60, 120, 200, 320, 500], dmg: 0.08,
-               fmt: (L) => '+' + Math.round(L * 8) + '% danno' },
-  destrezza: { name: 'Destrezza', icon: 'ico_dart',  costs: [60, 120, 200, 320, 500], cd: 0.04, dodge: 0.02,
-               fmt: (L) => '-' + Math.round(L * 4) + '% ricarica armi, +' + Math.round(L * 2) + '% schivata' },
-  vita:      { name: 'Vita',      icon: 'ico_heart', costs: [50, 100, 170, 270, 420], hp: 15,
-               fmt: (L) => '+' + L * 15 + ' vita massima' },
-  magia:     { name: 'Magia',     icon: 'ico_beam',  costs: [80, 150, 250, 380, 600], power: 0.12, cd: 0.08,
-               fmt: (L) => 'abilità +' + Math.round(L * 12) + '% potenza, -' + Math.round(L * 8) + '% ricarica' },
+  forza:     { name: 'Forza',     icon: 'ico_might', costs: TRAIT_COSTS, dmg: 0.05,
+               fmt: (L) => '+' + Math.round(L * 5) + '% danno' },
+  destrezza: { name: 'Destrezza', icon: 'ico_dart',  costs: TRAIT_COSTS, cd: 0.025, dodge: 0.012,
+               fmt: (L) => '-' + Math.round(L * 2.5) + '% ricarica armi, +' + Math.round(L * 1.2) + '% schivata' },
+  vita:      { name: 'Vita',      icon: 'ico_heart', costs: TRAIT_COSTS.map((c) => Math.round(c * 0.85)), hp: 10,
+               fmt: (L) => '+' + L * 10 + ' vita massima' },
+  magia:     { name: 'Magia',     icon: 'ico_beam',  costs: TRAIT_COSTS.map((c) => Math.round(c * 1.25)), power: 0.08, cd: 0.05,
+               fmt: (L) => 'abilità +' + Math.round(L * 8) + '% potenza, -' + Math.round(L * 5) + '% ricarica' },
 };
+// prezzi della Locanda a 5 livelli (fino al 2026-10-28): servono solo per rimborsare chi aveva già comprato (Save.normalize v5)
+const TRAITS_OLD = { forza: [60, 120, 200, 320, 500], destrezza: [60, 120, 200, 320, 500], vita: [50, 100, 170, 270, 420], magia: [80, 150, 250, 380, 600] };

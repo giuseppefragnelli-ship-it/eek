@@ -5,7 +5,7 @@
 // Al primo avvio con internet il telefono scarica i file nuovi; la volta dopo che apri il gioco gira la versione nuova.
 // Se aggiungi un file (un nuovo .js, un'immagine), aggiungilo anche a FILES.
 
-const VERSION = 'v9';
+const VERSION = 'v16';
 const CACHE = 'slime98-' + VERSION;
 const FILES = [
   './',

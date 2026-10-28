@@ -1064,6 +1064,7 @@ const SPR = {
     this.fromRows('ico_orb', ['...u...', '.......', 'u..9..u', '..tut..', 'u..t..u', '.......', '...u...']);
     this.fromRows('ico_bolt', ['...999.', '..99p..', '.99p...', '9999999', '...p99.', '..p99..', '.99p...', '.9p....', '9......']);
     this.cache.ico_bomb = this.cache.bomb; this.url.ico_bomb = this.url.bomb;
+    this.fromRows('ico_meteor', ['9.........', '.9C.......', '..9C......', '...9CC....', '....9CDD..', '.....DCCD.', '....DC9wCD', '....DCC9CD', '.....DCCD.', '......DD..']);
     this.fromRows('ico_might', ['..DDDD..', '.D9CCCD.', 'D9wCCCCD', 'DCCCCCCD', 'DDCCCCDD', '.DDDDDD.', '..DDDD..']);
     this.fromRows('ico_speed', ['uu..uu...', '.uu..uu..', '..uu..uu.', '...uu..uu', '..uu..uu.', '.uu..uu..', 'uu..uu...']);
     this.fromRows('ico_heart', ['.HH...HH.', 'HIIH.HHHH', 'HIHHHHHHH', 'HHHHHHHHH', '.HHHHHHH.', '..HHHHH..', '...HHH...', '....H....']);

@@ -444,7 +444,7 @@ body.touch span.tc { display: inline; }
 /* ---------- botteghe migliorabili / bacheca ---------- */
 .upbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px 8px; border-bottom: 1px solid var(--lo2); margin-bottom: 4px; }
 .uppips { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 4px; }
-.uppips i { width: 10px; height: 4px; background: var(--hi2); display: inline-block; }
+.uppips i { width: 7px; height: 4px; background: var(--hi2); display: inline-block; }
 .uppips i.on { background: #d1a93a; }
 .srow.unavail .sname { color: var(--dim); }
 .srow.unavail .simg img { filter: brightness(0); opacity: .6; }
@@ -576,6 +576,19 @@ body.touch.st-play.has-tele #telebtn { display: block; }
 #sk-gelo.left { right: auto; left: calc(27px + env(safe-area-inset-left, 0px)); }
 #ui .skbtn { pointer-events: auto; }
 body.touch.st-play.has-ira #sk-ira, body.touch.st-play.has-gelo #sk-gelo { display: block; }
+/* icone dei tasti (2026-10-28): fiamma (IRA), fiocco (GELO), saetta (TELE). Spente in ricarica, accese e pulsanti quando pronte */
+.skico { position: relative; display: block; margin: 0 auto 1px; width: 24px; height: 24px; fill: #3a3a32; stroke: none; transition: fill .15s; }
+.skico.line { fill: none; stroke: #3a3a32; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.skico .in { fill: #000; opacity: .35; }
+#telebtn .skico { width: 26px; height: 26px; margin-top: -2px; }
+.skbtn span { display: block; font-size: 8px; }
+.skbtn.ready .skico { fill: var(--c); filter: drop-shadow(0 0 4px var(--c)); animation: skpulse 1.2s ease-in-out infinite; }
+.skbtn.ready .skico.line { fill: none; stroke: var(--c); }
+.skbtn.ready .skico .in { fill: #fff; opacity: .85; }
+#telebtn.ready .skico { fill: var(--yel); filter: drop-shadow(0 0 4px var(--yel)); }
+#telebtn.up.ready .skico { fill: #fff; filter: drop-shadow(0 0 5px var(--pink)); }
+.skbtn.ready { box-shadow: 0 0 0 2px #000, 0 0 0 3px var(--c), 0 0 12px var(--c), inset 0 0 0 4px rgba(0,0,0,.4); }
+@keyframes skpulse { 50% { transform: scale(1.12); } }
 /* Locanda: le abilità nel negozio */
 .sklbl { font: bold 9px var(--pixel); color: var(--pink); }
 .skrow:last-child .sklbl { color: var(--grn); }

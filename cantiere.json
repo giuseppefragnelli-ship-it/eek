@@ -1,0 +1,32 @@
+{
+  "_nota": "Lista lavori letta dal pannello 'S98 cantiere'. stato: da fare | in corso | fatto",
+  "fasi": [
+    {
+      "nome": "Fase 1 — Bilanciamento (numeri)",
+      "lavori": [
+        { "n": "1",   "cosa": "Rallentare guadagno EXP e monete", "stato": "fatto" },
+        { "n": "2",   "cosa": "Allungare un po' le partite", "stato": "fatto" },
+        { "n": "2.5", "cosa": "Prime 2 mappe: mob molto più lenti (ma fanno male)", "stato": "fatto" },
+        { "n": "4",   "cosa": "Locanda: 11 livelli per stat, costosi", "stato": "fatto" }
+      ]
+    },
+    {
+      "nome": "Fase 2 — Grafica",
+      "lavori": [
+        { "n": "7",   "cosa": "Notte: colori freddi/scuri ma visibilità totale", "stato": "fatto" },
+        { "n": "8",   "cosa": "Villaggio in alta risoluzione", "stato": "fatto" },
+        { "n": "3+5", "cosa": "Abilità IRA/GELO: effetti e tasti nuovi", "stato": "fatto" },
+        { "n": "3+5b", "cosa": "Armi: scie e bagliori in alta risoluzione", "stato": "fatto" }
+      ]
+    },
+    {
+      "nome": "Fase 3 — Contenuti nuovi",
+      "lavori": [
+        { "n": "6",   "cosa": "Boss più forti: frecce, fulmini, ti inseguono", "stato": "fatto" },
+        { "n": "9",   "cosa": "La Morte si può sconfiggere (prende danni)", "stato": "fatto" },
+        { "n": "10",  "cosa": "Nuova skill: pioggia di meteore", "stato": "fatto" },
+        { "n": "11",  "cosa": "Mostri che aprono buchi con braccia giganti", "stato": "fatto" }
+      ]
+    }
+  ]
+}

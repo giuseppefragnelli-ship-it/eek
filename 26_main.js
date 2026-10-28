@@ -59,7 +59,7 @@ function goToMenu() {
   Enemies.clear(); Projectiles.clear(); Gems.clear(); FX.clear(); EShots.clear(); Zones.clear();
   Obs.n = 0;
   // BUG risolto: uscendo durante la notte (o un lampo) il menu restava buio
-  G.night = false; G.flash = 0; G.shake = 0; G.victory = false; Strikes.n = 0;
+  G.night = false; G.flash = 0; G.shake = 0; G.victory = false; Strikes.n = 0; SkillFx.clear(); Meteors.n = 0; Pits.n = 0;
   G.scene = 'menu';
   Player.reset();
   menuMapId = null;
@@ -142,6 +142,7 @@ function step(dt) {
   updateZones(dt);
   updatePlayerContacts(dt);
   updateStrikes(dt);
+  updatePits(dt);
   updateEShots(dt);
   if (Death.on && G.state === 'play') Death.update(dt);   // LA MORTE (minuto 14)
   if (G.state !== 'play') return;
@@ -184,7 +185,7 @@ function step(dt) {
 function swapIsle(map) {
   G.map = map; MapGen.reset(map === REEF_MAP ? 'reef' : G.mapId);
   Enemies.clear(); Projectiles.clear(); EShots.clear(); Zones.clear(); Gems.clear(); FX.clear();
-  Boss.n = 0; Boss.sync(); Strikes.n = 0; UI.showBoss(false);
+  Boss.n = 0; Boss.sync(); Strikes.n = 0; Pits.n = 0; UI.showBoss(false);
   Obs.n = 0; collectObstacles();
   if (Death.on) Death.place();   // la Morte ti segue anche di là
   G.flash = 0.1; addShake(4); Sfx.play('portal');

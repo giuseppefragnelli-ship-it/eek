@@ -155,9 +155,10 @@ const Village = {
   draw(alpha) {
     this.build();
     const R = Render, main = R.ctx;
-    // canvas del villaggio a risoluzione ridotta, poi ingrandito di un fattore intero (2 o 3)
-    // scelto perché sul lato corto si vedano ~170 pixel del villaggio su ogni schermo
-    const K = this.K = Math.max(2, Math.round(Math.min(R.W, R.H) / 170));
+    // canvas del villaggio a risoluzione ridotta, poi ingrandito di K pixel del gioco (a passi di 0.5: il canvas vero
+    // è 2x, quindi ogni pixel del villaggio resta un quadrato netto di 2K pixel reali).
+    // Dal 2026-10-28 ~260 pixel del villaggio sul lato corto (erano ~170): pixel più fini, si vede più villaggio.
+    const K = this.K = Math.max(1.5, Math.round(Math.min(R.W, R.H) / 260 * 2) / 2);
     const VW = Math.ceil(R.W / K), VH = Math.ceil(R.H / K);
     if (!this.cv) { this.cv = document.createElement('canvas'); this.vctx = this.cv.getContext('2d', { alpha: false }); }
     if (this.cv.width !== VW || this.cv.height !== VH) { this.cv.width = VW; this.cv.height = VH; this.vctx.imageSmoothingEnabled = false; }

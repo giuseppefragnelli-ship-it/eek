@@ -12,11 +12,15 @@ const MAPS = {
                 // SICILIA = muro iniziale: slime simpatici (cute) ma POCHI e CATTIVISSIMI. Le prime partite durano pochi secondi:
                 // per andare avanti serve fortuna (jackpot = pioggia di monete rara) e spendere alla Locanda.
                 //   spawn = quanti nemici rispetto al normale | mobDmg / mobSpeed = danno e velocità dei nemici normali (non dei boss)
+                //   swarmEvery = secondi tra uno sciame di larve e l'altro (normale: SPAWN.swarmEvery = 16)
                 //   jackpot: chance = probabilità per uccisione, coins = [min, max] monete che piovono
-                cute: true, spawn: 0.5, mobDmg: 4, mobSpeed: 1.35, jackpot: { chance: 0.012, coins: [12, 30] },
-                hp: 1.0, dmg: 1.0, coin: 1.0, unlock: null,     spitter: 1.0, swarm: 0.5, desc: '"Per me si va ne la città dolente." Un\'isola di rovine: oltre la spiaggia, solo mare.' },
+                // 2026-10-28: lenti e meno numerosi (prima spawn 0.5, mobDmg 4, mobSpeed 1.35, swarm 0.5), ma il morso resta cattivo
+                cute: true, spawn: 0.2, mobDmg: 3, mobSpeed: 0.55, swarmEvery: 50, jackpot: { chance: 0.009, coins: [10, 24] },
+                hp: 1.0, dmg: 1.0, coin: 1.0, unlock: null,     spitter: 1.0, swarm: 0.3, desc: '"Per me si va ne la città dolente." Un\'isola di rovine: oltre la spiaggia, solo mare.' },
   palude:     { name: 'Sardegna', short: 'Sardegna',                floor: 'palude',     props: ['pl_reed', 'pl_tuft', 'pl_bush', 'pl_fern'], obstacle: 'o_tree',     obstacles: 3, obsR: 16,
-                hp: 1.25, dmg: 1.12, coin: 1.25, unlock: 'cripta', spitter: 1.0, swarm: 1.6, special: 'toxic', specialShare: 0.16,
+                // 2026-10-28: lenti e meno numerosi anche qui (prima niente spawn/mobSpeed e swarm 1.6)
+                spawn: 0.45, mobSpeed: 0.6, swarmEvery: 28,
+                hp: 1.25, dmg: 1.12, coin: 1.25, unlock: 'cripta', spitter: 1.0, swarm: 0.8, special: 'toxic', specialShare: 0.16,
                 desc: '"Fitti nel limo dicon: Tristi fummo."' },
   cattedrale: { name: 'La Cattedrale Sconsacrata', short: 'Cattedrale', floor: 'cattedrale', props: ['pl_sprout', 'pl_tuft', 'pl_leaves'],  obstacle: 'o_col',      obstacles: 4, obsR: 11, layout: 'ruins', temple: 0.32, stoa: 0.25,
                 hp: 1.5, dmg: 1.35, coin: 1.5, unlock: 'palude', spitter: 2.0, swarm: 1.2, special: 'ghost', specialShare: 0.22,
@@ -146,7 +150,8 @@ const REEF_MAP = Object.assign({}, MAPS.cripta, {
 const UNLOCKS = {
   wisps:    { map: 'cripta', time: 660, name: 'Linguae Ignis', kind: 'Arma segreta', hint: "resisti fino all'11:00 in Sicilia",
               desc: 'Ora può uscire nelle carte del level up.' },
-  teleport: { map: 'palude', time: 660, name: 'Teletrasporto', kind: 'Abilità', hint: "resisti fino all'11:00 in Sardegna",
+  // dal 2026-10-28 il teletrasporto NON si sblocca col tempo (map: null): servono TELE_UNLOCK.arrows frecce schivate (countDodge)
+  teleport: { map: null, time: Infinity, name: 'Teletrasporto', kind: 'Abilità', hint: '100 frecce schivate',
               desc: 'Tasto E (sul telefono il tasto TELE): ti sposta di colpo di qualche passo dove vai.' },
   facile:   { map: 'cattedrale', time: 660, name: 'Modalità Facile', kind: 'Modalità', hint: "resisti fino all'11:00 nella Cattedrale",
               desc: 'Solo nel Cocito: la scegli dalla scheda della mappa. Facile per modo di dire: dannati 10 volte più forti.' },

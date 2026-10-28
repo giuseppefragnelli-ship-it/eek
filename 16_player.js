@@ -204,8 +204,7 @@ const Player = {
     const pw = this.magicPow, dmg = K.dmg * this.dmgMult * pw * CFG.enemyHpMult(G.time), r = K.r * (1 + (pw - 1) * 0.5);
     if (id === 'ira') {
       // IRA DI DITE: le mura infuocate esplodono attorno a te — danno e spinta forte
-      spawnFx(FXK.NOVA, this.x, this.y, 0.55, r);
-      spawnFx(FXK.RING, this.x, this.y, 0.4, r * 0.6);
+      SkillFx.add('ira', this.x, this.y, r);
       damageArea(this.x, this.y, r, dmg, K.kb);
       addShake(6);
       Sfx.play('boom');
@@ -219,8 +218,7 @@ const Player = {
         if (ex * ex + ey * ey > r * r) continue;
         E.frz[j] = t; E.frzM[j] = 0;
       }
-      spawnFx(FXK.RING, this.x, this.y, 0.6, r);
-      spawnFx(FXK.NOVA, this.x, this.y, 0.4, r * 0.5);
+      SkillFx.add('gelo', this.x, this.y, r);
       damageArea(this.x, this.y, r, dmg, 0);
       Sfx.play('frost');
     }

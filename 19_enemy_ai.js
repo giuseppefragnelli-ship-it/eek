@@ -38,7 +38,7 @@ function updateEnemies(dt) {
   const maxN = CFG.SEPARATION_MAX_NEIGHBORS;
   const slowFactor = G.slowFactor;
   const nightSpd = G.night ? NIGHT.speedMult : 1;
-  const ELITE_T = ET.elite, SPITTER_T = ET.spitter, TOXIC_T = ET.toxic, GHOST_T = ET.ghost, LUPA_T = ET.lupa, FURIA_T = ET.furia, hasObs = Obs.n > 0;
+  const FOSSOR_T = ET.fossor, ELITE_T = ET.elite, SPITTER_T = ET.spitter, TOXIC_T = ET.toxic, GHOST_T = ET.ghost, LUPA_T = ET.lupa, FURIA_T = ET.furia, hasObs = Obs.n > 0;
   const nearX = G.viewW * 0.6, t = G.time;
   const island = !!G.map.isle, isl2 = island ? (G.map.isle.min - CFG.MAX_ENEMY_R) * (G.map.isle.min - CFG.MAX_ENEMY_R) : 0;
   // CALORE: la separazione (ogni slime controlla i vicini) era quasi tutto il costo della simulazione.
@@ -154,6 +154,19 @@ function updateEnemies(dt) {
       }
     }
 
+    // Scavatore: si avvicina, si ferma a scavare (aiS = 1, sbuffi di terra) e apre un buco sotto di te
+    else if (E.type[i] === FOSSOR_T) {
+      E.aiT[i] -= dt;
+      if (E.aiS[i] === 1) {
+        vx = vy = 0;
+        if (((t * 8 + i) | 0) % 3 === 0 && d < nearX) spawnFx(FXK.PUFF, X[i] + (Math.random() - 0.5) * 20, Y[i] + 8, 0.3, 8);
+        if (E.aiT[i] <= 0) {
+          E.aiS[i] = 0; E.aiT[i] = FOSSOR.cd * (0.8 + Math.random() * 0.4);
+          addPit(px + Input.ax * FOSSOR.lead, py + Input.ay * FOSSOR.lead, E.dmg[i] / ENEMY_DEFS[FOSSOR_T].dmg);
+        }
+      } else if (E.aiT[i] <= 0 && d < FOSSOR.range) { E.aiS[i] = 1; E.aiT[i] = FOSSOR.dig; }
+    }
+
     // Gelo / Flagello: rallentato o fermo
     if (E.frz[i] > 0) { E.frz[i] -= dt; vx *= E.frzM[i]; vy *= E.frzM[i]; }
 
@@ -184,6 +197,37 @@ function updateEnemies(dt) {
     if (hasObs && E.type[i] !== GHOST_T && !(offScreen && ((i + tick) & 1))) { const pp = pushOutOfObstacles(X[i], Y[i], ri * 0.8); if (pp.hit) { X[i] = pp.x; Y[i] = pp.y; } }
     // Sicilia: anche i dannati restano a riva (il confronto veloce scarta chi è lontano dal mare)
     if (island && X[i] * X[i] + Y[i] * Y[i] > isl2) { const c = islandClamp(X[i], Y[i], ri); X[i] = c.x; Y[i] = c.y; }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// BUCHI E BRACCIA (Scavatore): array fissi. t = tempo dall'apertura; il braccio esce a FOSSOR.tell,
+// resta su FOSSOR.up e rientra in 0.35 s. mult = forza (il danno segue quello dello Scavatore: tempo, mappa, notte...).
+// hit = già colpito (un colpo per braccio).
+// ---------------------------------------------------------------------------
+const Pits = { max: 24, n: 0, x: new Float32Array(24), y: new Float32Array(24), t: new Float32Array(24), mult: new Float32Array(24), hit: new Uint8Array(24), side: new Int8Array(24) };
+const PIT_END = FOSSOR.tell + FOSSOR.up + 0.35;
+function addPit(x, y, mult) {
+  const P = Pits;
+  if (P.n >= P.max) return;
+  if (G.map.isle) { const c = islandClamp(x, y, FOSSOR.r); x = c.x; y = c.y; }
+  const k = P.n++;
+  P.x[k] = x; P.y[k] = y; P.t[k] = 0; P.mult[k] = mult; P.hit[k] = 0; P.side[k] = Math.random() < 0.5 ? -1 : 1;
+  Sfx.play('spit');
+}
+function updatePits(dt) {
+  const P = Pits, F = FOSSOR;
+  for (let k = 0; k < P.n; k++) {
+    const was = P.t[k];
+    P.t[k] += dt;
+    if (was < F.tell && P.t[k] >= F.tell) { addShake(3); Sfx.play('boom'); spawnFx(FXK.PUFF, P.x[k], P.y[k], 0.4, 26); }
+    if (P.t[k] >= F.tell + F.rise * 0.5 && P.t[k] < F.tell + F.up && !P.hit[k]) {   // colpisce quando il braccio è quasi fuori
+      const dx = Player.x - P.x[k], dy = Player.y - P.y[k], rr = F.r + Player.r;
+      if (dx * dx + dy * dy < rr * rr) { P.hit[k] = 1; Player.hurt(F.dmg * P.mult[k] * CFG.enemyDmgMult(G.time) * G.diff.dmg * G.map.dmg); }
+    }
+    if (P.t[k] >= PIT_END) {
+      P.n--; P.x[k] = P.x[P.n]; P.y[k] = P.y[P.n]; P.t[k] = P.t[P.n]; P.mult[k] = P.mult[P.n]; P.hit[k] = P.hit[P.n]; P.side[k] = P.side[P.n]; k--;
+    }
   }
 }
 
@@ -231,22 +275,38 @@ function updateEShots(dt) {
       S.alive[i] = 0;
       if (S.kind[i] === 4 && Player.teleInvT > 0) countDodge(S.x[i], S.y[i]);   // passata attraverso durante il teletrasporto: schivata
       Player.hurt(S.dmg[i]);
-      if (G.state !== 'play') return;
+      if (G.state !== 'play') {
+        // ucciso da una freccia: il conto per il teletrasporto riparte da zero
+        if (S.kind[i] === 4 && !Player.tele && Save.data.arrowStreak > 0) { Save.data.arrowStreak = 0; Save.write(); }
+        return;
+      }
       continue;
     }
     // FRECCE SCHIVATE: una freccia che ti passa vicino e poi si allontana senza colpirti
-    if (S.kind[i] === 4 && S.near[i] !== 2 && Player.tele) {
+    if (S.kind[i] === 4 && S.near[i] !== 2) {
       if (S.near[i] === 0) { if (d2 < DODGE.r * DODGE.r) S.near[i] = 1; }
       else if (dx * S.vx[i] + dy * S.vy[i] > 0) { S.near[i] = 2; countDodge(S.x[i], S.y[i]); }
     }
   }
 }
 
-// una freccia schivata: conto per sempre (Save.data.dodges); a TELE_UP.dodges il teletrasporto si potenzia
+// una freccia schivata. Senza teletrasporto: conto per sbloccarlo (Save.data.arrowStreak, TELE_UNLOCK).
+// Col teletrasporto: conto per sempre (Save.data.dodges); a TELE_UP.dodges il teletrasporto si potenzia
 function countDodge(x, y) {
-  if (G.cheat || !Player.tele) return;
-  const d = ++Save.data.dodges;
+  if (G.cheat) return;
   spawnFx(FXK.GLINT, x, y, 0.3, 10);
+  if (!Player.tele) {
+    const s = ++Save.data.arrowStreak;
+    if (s >= TELE_UNLOCK.arrows) {
+      Save.data.unlocks.teleport = true; Save.write();
+      Player.tele = true; Player.teleCd = 0; document.body.classList.add('has-tele');
+      spawnFx(FXK.RING, Player.x, Player.y, 0.6, 160);
+      Sfx.play('quest');
+      UI.toast(UNLOCKS.teleport.name, '', 4, true);
+    } else if (s % TELE_UNLOCK.toastEvery === 0) UI.toast('Frecce schivate', s + ' / ' + TELE_UNLOCK.arrows, 2);
+    return;
+  }
+  const d = ++Save.data.dodges;
   if (d === TELE_UP.dodges) {
     Player.teleUp = true;
     Save.write();

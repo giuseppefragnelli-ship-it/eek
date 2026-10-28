@@ -72,7 +72,7 @@ const Spawner = {
     }
     // LA MORTE al minuto 14
     if (!Death.warned && t >= DEATH.warnAt) { Death.warned = true; Sfx.play('warn'); }
-    if (!Death.on && t >= DEATH.time) Death.spawn();
+    if (!Death.on && t >= Death.nextT) Death.spawn();
 
     // Cacciatori dal minuto 4
     if (t >= ELITE.start && t < SKULLS.time) {
@@ -97,31 +97,67 @@ const Spawner = {
     }
     this.swarmT -= dt;
     if (this.swarmT <= 0) {
-      this.swarmT = SPAWN.swarmEvery;
+      this.swarmT = G.map.swarmEvery || SPAWN.swarmEvery;
       spawnSwarm(t >= SKULLS.time ? ET.skull : ET.drop, Math.round((SPAWN.swarmSize[0] + Math.random() * (SPAWN.swarmSize[1] - SPAWN.swarmSize[0])) * Math.sqrt(G.diff.spawn) * G.map.swarm));
     }
   },
 };
 
-// LA MORTE: fuori dal pool dei nemici (le armi non la vedono), una sola, ti insegue e ti uccide al tocco
+// LA MORTE: una sola, ti insegue e ti uccide al tocco. La posizione vera è qui (Death.x/y); nel pool c'è il suo "corpo"
+// (tipo ET.death, un boss nella lista Boss) che le armi colpiscono: Death.update lo tiene attaccato a lei.
+// Se il corpo sparisce (passaggio sullo Scoglio: il pool si svuota) lo ricrea con la vita che le restava (Death.hp).
 const Death = {
-  on: false, warned: false, x: 0, y: 0, px: 0, py: 0, t: 0, face: 1,
-  reset() { this.on = false; this.warned = false; this.t = 0; },
+  on: false, warned: false, x: 0, y: 0, px: 0, py: 0, t: 0, face: 1, hp: 0, maxHp: 0, beaten: 0, nextT: DEATH.time,
+  reset() { this.on = false; this.warned = false; this.t = 0; this.beaten = 0; this.nextT = DEATH.time; },
   // appare appena fuori dalla vista (anche passando da un'isola all'altra)
   place() { const p = ringPoint(120); this.x = this.px = p.x; this.y = this.py = p.y; },
   spawn() {
     this.on = true; this.t = 0; this.place();
+    this.hp = this.maxHp = DEATH.hp * G.diff.hp * G.map.hp * Math.pow(DEATH.harder, this.beaten);
+    this.body();
     addShake(6); Sfx.play('night');
     UI.reaper(DEATH.portrait); G.hitStop = Math.max(G.hitStop, DEATH.portrait);   // il ritratto a tutto schermo: il gioco si ferma un attimo
+  },
+  // indice del corpo nel pool (-1 se non c'è)
+  idx() { for (let k = 0; k < Boss.n; k++) if (Boss.slots[k].kind === ET.death) return Boss.list[k]; return -1; },
+  body() {
+    if (Boss.n >= Boss.MAX) return -1;
+    const i = spawnEnemy(ET.death, this.x, this.y);
+    if (i < 0) return -1;
+    const E = Enemies, S = Boss.slots[Boss.n];
+    Boss.list[Boss.n++] = i;
+    S.kind = ET.death; S.uid = E.uid[i]; S.cfg = { name: ENEMY_DEFS[ET.death].name }; S.trial = null; S.reef = false;
+    E.hp[i] = this.hp; E.maxHp[i] = this.maxHp; E.r[i] = DEATH.r;
+    Boss.sync(); UI.showBoss(true);
+    return i;
+  },
+  // battuta (da onBossKilled): ricompensa grossa, torna più forte dopo DEATH.again secondi
+  killed(x, y) {
+    this.on = false; this.beaten++; this.nextT = G.time + DEATH.again;
+    const R = DEATH.reward;
+    for (let k = 0; k < R.gems; k++) { const a = Math.random() * 6.283, d = 20 + Math.random() * 140; spawnGem(x + Math.cos(a) * d, y + Math.sin(a) * d, R.gemVal, GK.XP); }
+    for (let k = 0; k < R.coins * G.diff.coin; k++) { const a = Math.random() * 6.283, d = 10 + Math.random() * 90; spawnGem(x + Math.cos(a) * d, y + Math.sin(a) * d, 1, GK.COIN); }
+    spawnGem(x, y + 24, 3, GK.CHEST);
+    spawnGem(x + 22, y, CFG.drops.healAmount * 2, GK.HEAL);
+    G.rs.bosses.death = (G.rs.bosses.death || 0) + 1;
+    G.hitStop = 0.6; G.flash = Math.max(G.flash, 0.5); addShake(10);
+    spawnFx(FXK.RING, x, y, 0.8, 220); spawnFx(FXK.BOOM, x, y, 0.6, 120);
+    Sfx.play('bossDie'); Sfx.play('victory');
+    UI.showBoss(Boss.n > 0);
+    UI.toast('Mors Mortua', '', 4, true);
   },
   update(dt) {
     this.t += dt;
     this.px = this.x; this.py = this.y;
+    let bi = this.idx();
+    if (bi < 0) bi = this.body();
+    if (bi >= 0) this.hp = Enemies.hp[bi];
     const dx = Player.x - this.x, dy = Player.y - this.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
     const spd = Player.speed * Math.min(DEATH.max, DEATH.speed + DEATH.accel * this.t);
     const s = Math.min(d, spd * dt);
     this.x += dx / d * s; this.y += dy / d * s;
     if (dx > 2) this.face = 1; else if (dx < -2) this.face = -1;
+    if (bi >= 0) { const E = Enemies; E.x[bi] = this.x; E.y[bi] = this.y; E.px[bi] = this.px; E.py[bi] = this.py; E.kx[bi] = E.ky[bi] = 0; }
     const rr = DEATH.r + Player.r;
     if (d < rr && !G.god && G.state === 'play') {
       // un colpo solo: niente schivata, armatura o invulnerabilità
@@ -135,6 +171,7 @@ function pickEnemyType(t) {
   if (t >= SKULLS.time) return ET.skull;   // dopo l'11:00 solo teschi
   // nemico speciale della mappa (Slime Velenoso nella Palude, Spettro nella Cattedrale)
   if (t >= 60 && G.map.special && Math.random() < G.map.specialShare) return ET[G.map.special];
+  if (t >= FOSSOR.from && Math.random() < FOSSOR.share) return ET.fossor;   // Scavatore: buchi e braccia
   const r = Math.random();
   if (t < 30) return r < 0.55 ? ET.drop : r < 0.8 ? ET.heavy : ET.fast;
   if (t < 90) return r < 0.4 ? ET.drop : r < 0.7 ? ET.heavy : ET.fast;

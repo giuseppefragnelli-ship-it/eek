@@ -55,9 +55,9 @@ const CFG = {
   screenShake: true,
   damageNumbers: true,
 
-  // Esperienza necessaria per passare dal livello L al L+1
+  // Esperienza necessaria per passare dal livello L al L+1 (x1.5 dal 2026-10-28: si sale più piano)
   xpToNext(level) {
-    return Math.floor(3 + level * 2.4 + level * level * 0.35);
+    return Math.floor((3 + level * 2.4 + level * level * 0.35) * 1.5);
   },
 
   // Crescita dei nemici col tempo (secondi), poi moltiplicata per la difficoltà
@@ -80,9 +80,10 @@ const DAY_LIFT = { mul: 1.6, add: 3 };
 // ----------------------------------------------------------------------------
 const DIFFICULTY = {
   // Normale e Difficile tolte il 2026-10-16: si gioca solo a Incubo. I salvataggi vecchi passano qui da soli (Save.load).
-  incubo:    { label: 'Incubo',    spawn: 2.4,  hp: 1.6,  dmg: 2.0,  speed: 1.25, coin: 5, desc: '"Non ragioniam di lor, ma guarda e passa." · Monete x5' },
+  // coin 5 -> 3 il 2026-10-28: monete più lente (vale anche per bonus al minuto, vittoria e boss)
+  incubo:    { label: 'Incubo',    spawn: 2.4,  hp: 1.6,  dmg: 2.0,  speed: 1.25, coin: 3, desc: '"Non ragioniam di lor, ma guarda e passa." · Monete x3' },
   // FACILE (per modo di dire): si sblocca resistendo fino all'11:00 nella Cattedrale (UNLOCKS.facile) e vale SOLO
   // sulla mappa `map` (l'ultima, il Cocito): dannati e boss 10 volte più forti di Incubo, sia di vita che di morso.
-  facile:    { label: 'Facile',    spawn: 2.4,  hp: 16,   dmg: 20,   speed: 1.25, coin: 5, map: 'cocito', unlock: 'facile', desc: '"Facile." Solo nel Cocito: dannati 10 volte più forti.' },
+  facile:    { label: 'Facile',    spawn: 2.4,  hp: 16,   dmg: 20,   speed: 1.25, coin: 3, map: 'cocito', unlock: 'facile', desc: '"Facile." Solo nel Cocito: dannati 10 volte più forti.' },
 };
 const DEFAULT_DIFFICULTY = 'incubo';

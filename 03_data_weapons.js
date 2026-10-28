@@ -136,6 +136,27 @@ const WEAPON_DEFS = {
     },
   },
 
+  // PIOGGIA DI METEORE (2026-10-28): meteore cadono dal cielo su dannati a caso sullo schermo. Prima il segno a terra,
+  // dopo `fall` secondi l'impatto (danno ad area + spinta). Evoluta: più grosse e lasciano una pozza di fuoco.
+  meteor: {
+    name: 'Imber Siderum', icon: 'ico_meteor',
+    desc: '"Sic itur ad astra." (Ma al contrario.)',
+    levels: [
+      { dmg: 30, cd: 3.0, amount: 1, area: 46 },
+      { dmg: 30, cd: 3.0, amount: 2, area: 46 },
+      { dmg: 42, cd: 2.8, amount: 2, area: 54 },
+      { dmg: 42, cd: 2.5, amount: 3, area: 58 },
+      { dmg: 58, cd: 2.2, amount: 4, area: 66 },
+    ],
+    upDesc: ['', '+1 meteora', '+danno, +area', '+1 meteora, più frequente', '+danno, +1 meteora'],
+    evo: {
+      passive: 'area', name: 'Stelle Cadenti', icon: 'ico_meteor',
+      desc: '"E caddi come corpo morto cade."',
+      stats: { dmg: 80, cd: 1.8, amount: 6, area: 80, fire: 1 },
+    },
+    fall: 0.6, fireDur: 2.5, fireDmg: 0.2,
+  },
+
   bomb: {
     name: 'Ignis', icon: 'ico_bomb',
     desc: '"Ignis aurum probat."',
@@ -319,20 +340,21 @@ const WEAPON_DEFS = {
   wheel: {
     name: 'Rota Fortunae', icon: 'ico_wheel',
     desc: '"Vostro saver non ha contasto a lei." Una ruota che rimbalza da un dannato all\'altro e a ogni rimbalzo colpisce più forte.',
+    // 2026-10-28: era ~4 volte più forte delle altre armi -> danno /2, metà rimbalzi, niente più danno crescente
     levels: [
-      { dmg: 22, cd: 1.2,  amount: 2, speed: 420, bounces: 4, size: 1.0 },
-      { dmg: 22, cd: 1.2,  amount: 2, speed: 420, bounces: 6, size: 1.0 },
-      { dmg: 30, cd: 1.1,  amount: 3, speed: 440, bounces: 6, size: 1.1 },
-      { dmg: 30, cd: 0.95, amount: 3, speed: 440, bounces: 8, size: 1.1 },
-      { dmg: 40, cd: 0.8,  amount: 4, speed: 460, bounces: 10, size: 1.2 },
+      { dmg: 11, cd: 1.3,  amount: 2, speed: 420, bounces: 2, size: 1.0 },
+      { dmg: 11, cd: 1.3,  amount: 2, speed: 420, bounces: 3, size: 1.0 },
+      { dmg: 15, cd: 1.2,  amount: 2, speed: 440, bounces: 3, size: 1.1 },
+      { dmg: 15, cd: 1.1,  amount: 3, speed: 440, bounces: 4, size: 1.1 },
+      { dmg: 20, cd: 1.0,  amount: 3, speed: 460, bounces: 5, size: 1.2 },
     ],
-    upDesc: ['', '+2 rimbalzi', '+danno, +1 ruota', '+2 rimbalzi, più frequente', '+danno, +1 ruota, +2 rimbalzi'],
+    upDesc: ['', '+1 rimbalzo', '+danno', '+1 ruota, +1 rimbalzo, più frequente', '+danno, +1 rimbalzo'],
     evo: {
       passive: 'greed', name: 'Ministra e Duce', icon: 'ico_wheel',
-      desc: '"General ministra e duce." Ruote che non smettono di girare: 16 rimbalzi.',
-      stats: { dmg: 55, cd: 0.65, amount: 6, speed: 500, bounces: 16, size: 1.35 },
+      desc: '"General ministra e duce." Ruote che non smettono di girare: 8 rimbalzi.',
+      stats: { dmg: 28, cd: 0.85, amount: 4, speed: 500, bounces: 8, size: 1.35 },
     },
-    life: 1.3, bounceR: 220, bounceDmg: 1.1, kb: 40,
+    life: 1.3, bounceR: 220, bounceDmg: 1.0, kb: 40,
   },
 
   // TRIBOLI — chiodi a quattro punte sparsi dietro di te: chi ci passa sopra si ferisce e rallenta (slow = velocità

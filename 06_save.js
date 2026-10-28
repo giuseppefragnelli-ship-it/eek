@@ -33,13 +33,14 @@ const Save = {
       recipes: {},          // ricette di fusione (FUSION_SPECIAL): chiave -> 1 comprata (Custode da battere) | 2 sbloccata
       unlocks: {},          // sblocchi segreti (UNLOCKS): id -> true
       dodges: 0,            // frecce degli Arcieri schivate col teletrasporto (a TELE_UP.dodges si potenzia)
+      arrowStreak: 0,       // frecce schivate per sbloccare il teletrasporto (TELE_UNLOCK); torna a 0 se una freccia ti uccide
       traits: {},           // Locanda: forza / destrezza / vita / magia -> livello (TRAITS)
       reef: 0,              // volte che hai battuto Scilla (REEF): da 1 in su l'Aruspice legge 3 omina per oggetto
       fusions: {},          // fusioni uniche già scoperte (FUSION_SPECIAL): chiave -> true
       wins: {},             // mappe vinte: id -> true
       map: 'cripta',        // mappa scelta
       savedAt: 0,           // ms dell'ultimo salvataggio (per scegliere il più recente tra telefono e PC)
-      migr: 4,              // versione dei dati salvati
+      migr: 5,              // versione dei dati salvati
       gear: 'dagger',       // arma dell'Armaiolo che porti in partita
       shops: { weapons: 0, armor: 0, smith: 0 },   // livello delle botteghe
       mastery: {},          // Magister: passiva -> grado (0..3)
@@ -69,6 +70,7 @@ const Save = {
     d.mastery = d.mastery || {}; d.omens = d.omens || {};
     d.unlocks = d.unlocks && typeof d.unlocks === 'object' ? d.unlocks : {};
     d.dodges = Math.max(0, d.dodges | 0);
+    d.arrowStreak = Math.max(0, d.arrowStreak | 0);
     d.reef = Math.max(0, d.reef | 0);
     d.traits = d.traits && typeof d.traits === 'object' ? d.traits : {};
     for (const k in d.traits) if (!TRAITS[k]) delete d.traits[k]; else d.traits[k] = Math.max(0, Math.min(TRAITS[k].costs.length, d.traits[k] | 0));
@@ -90,6 +92,11 @@ const Save = {
     if (d.migr < 3) { d.stats.kills = Math.max(d.stats.kills, d.bestKills || 0); d.tips.intro = d.runs > 0; d.migr = 3; }
     // v4: resta solo Eek: i personaggi comprati tornano monete
     if (d.migr < 4) { const refund = { alchimista: 1, badessa: 15, fuochista: 20 }; for (const c of d.chars) d.coins = (d.coins || 0) + (refund[c] || 0); d.chars = ['eek']; d.char = 'eek'; d.migr = 4; }
+    // v5: la Locanda passa da 5 a 11 livelli (più deboli l'uno): i livelli comprati tornano monete ai prezzi vecchi e si riparte da 0
+    if (d.migr < 5) {
+      for (const k in d.traits) { const old = TRAITS_OLD[k] || []; for (let L = 0; L < Math.min(d.traits[k], old.length); L++) d.coins = (d.coins || 0) + old[L]; }
+      d.traits = {}; d.migr = 5;
+    }
     if (d.chars.indexOf('eek') < 0) d.chars.unshift('eek');
     if (!CHARACTERS[d.char] || d.chars.indexOf(d.char) < 0) d.char = 'eek';
     if (!MAPS[d.map] || !this.mapUnlocked(d.map, d)) d.map = 'cripta';

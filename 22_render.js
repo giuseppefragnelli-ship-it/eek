@@ -8,6 +8,37 @@
 // Tutto viene disegnato a coordinate intere: niente sbavature.
 // ============================================================================
 
+// EFFETTI DELLE ABILITÀ (Ira di Dite, Gelo di Cocito) — dal 2026-10-28 disegnati a risoluzione PIENA (mezzi pixel del
+// gioco = pixel veri del canvas 2x), con forme lisce invece dei soliti anelli a pixel. Pochi alla volta, niente allocazioni:
+// slot fissi e particelle precalcolate al lancio.
+//   dur = durata (s) | n = lingue di fuoco / cristalli | p = braci / scintille
+const SKILL_FX = { ira: { dur: 0.75, n: 28, p: 44 }, gelo: { dur: 1.0, n: 20, p: 34 } };
+// BAGLIORI DELLE ARMI (Render.weaponGlow), per tipo di proiettile (PK): c = colore, evo = colore da evoluta
+//   tail: scia lunga `len` pixel | spin: vortice di raggio `r` pixel (x grandezza) a velocità `spin` | flame: fiamma
+const WEAPON_GLOW = [];
+WEAPON_GLOW[0] = { t: 'tail', c: '#9fe6ff', evo: '#ff5fe0', len: 14 };   // SALT: Sagitta / kunai
+WEAPON_GLOW[5] = { t: 'tail', c: '#ffcf6a', evo: '#ffcf6a', len: 18 };   // ARROW: Arcus
+WEAPON_GLOW[2] = { t: 'spin', c: '#c9b8ff', evo: '#ff5fe0', r: 9, spin: 14 };   // SCYTHE: Falx Lunae
+WEAPON_GLOW[6] = { t: 'spin', c: '#ff9a4a', evo: '#ff9a4a', r: 8, spin: 11 };   // AXE: Bipennis
+WEAPON_GLOW[9] = { t: 'spin', c: '#ffe066', evo: '#ff5fe0', r: 9, spin: 18 };   // WHEEL
+WEAPON_GLOW[4] = { t: 'flame', c: '#ff7a1f', evo: '#9fe6ff' };                  // WISP: Linguae Ignis
+
+const SkillFx = {
+  MAX: 4, PN: 48,
+  slot: [],
+  init() {
+    for (let k = 0; k < this.MAX; k++) this.slot.push({ on: false, kind: '', x: 0, y: 0, r: 0, t0: 0, a: new Float32Array(this.PN), v: new Float32Array(this.PN), s: new Float32Array(this.PN) });
+  },
+  add(kind, x, y, r) {
+    if (!this.slot.length) this.init();
+    let f = this.slot[0];
+    for (const q of this.slot) if (!q.on) { f = q; break; } else if (q.t0 < f.t0) f = q;
+    f.on = true; f.kind = kind; f.x = x; f.y = y; f.r = r; f.t0 = G.time;
+    for (let k = 0; k < this.PN; k++) { f.a[k] = Math.random() * 6.2832; f.v[k] = 0.4 + Math.random() * 0.6; f.s[k] = Math.random(); }
+  },
+  clear() { for (const q of this.slot) q.on = false; },
+};
+
 const Render = {
   canvas: null, ctx: null,
   W: 0, H: 0,          // dimensioni del canvas in pixel di gioco
@@ -215,40 +246,6 @@ const Render = {
     }
   },
 
-  // VELO DELLA NOTTE: canvas a parte (pixel del gioco) riempito di blu-nero, con un buco netto attorno a (lx, ly)
-  // e un anello a retino sul bordo della luce; poi steso sopra al mondo in un colpo solo.
-  nightVeil(k, lx, ly, LR) {
-    const W = this.W, H = this.H;
-    let c = this.veilCv;
-    if (!c) { c = this.veilCv = document.createElement('canvas'); this.veilG = c.getContext('2d'); }
-    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; this.veilK = -1; }
-    // ridisegna il velo solo se cambia qualcosa (a notte piena e senza tremolio: mai)
-    if (this.veilK !== k || this.veilX !== lx || this.veilY !== ly || this.veilR !== LR) {
-      this.veilK = k; this.veilX = lx; this.veilY = ly; this.veilR = LR;
-      this._paintVeil(k, lx, ly, LR);
-    }
-    this.ctx.drawImage(c, 0, 0, W, H);
-  },
-  _paintVeil(k, lx, ly, LR) {
-    const W = this.W, H = this.H, g = this.veilG;
-    if (!this.veilPat) {   // scacchiera 50%
-      const d = document.createElement('canvas'); d.width = d.height = 2;
-      const dg = d.getContext('2d'); dg.fillRect(0, 0, 1, 1); dg.fillRect(1, 1, 1, 1);
-      this.veilPat = g.createPattern(d, 'repeat');
-    }
-    g.globalCompositeOperation = 'source-over';
-    g.clearRect(0, 0, W, H);
-    g.globalAlpha = NIGHT.dark * k; g.fillStyle = '#02030b'; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
-    g.globalCompositeOperation = 'destination-out';
-    const r0 = Math.max(4, LR - 12);
-    for (let dy = -LR; dy <= LR; dy++) {
-      const ho = Math.floor(Math.sqrt(LR * LR - dy * dy)), hi = Math.abs(dy) < r0 ? Math.floor(Math.sqrt(r0 * r0 - dy * dy)) : -1;
-      g.fillStyle = this.veilPat; g.fillRect(lx - ho, ly + dy, ho * 2 + 1, 1);           // bordo: metà dei pixel
-      if (hi >= 0) { g.fillStyle = '#000'; g.fillRect(lx - hi, ly + dy, hi * 2 + 1, 1); } // dentro: luce piena
-    }
-    g.globalCompositeOperation = 'source-over';
-  },
-
   // linea pixel (Bresenham)
   line(x0, y0, x1, y1) {
     const ctx = this.ctx;
@@ -354,6 +351,353 @@ const Render = {
     }
   },
 
+  // ARMI IN ALTA RISOLUZIONE (2026-10-28): sopra agli sprite a pixel, scie e bagliori lisci a mezzi pixel (canvas 2x),
+  // sommati alla luce ('lighter'). Dardi/frecce: scia affusolata | falci, asce, ruote: vortice | fuochi fatui: fiamma |
+  // sfere: arco luminoso | raggi del Lume: fascio a strati.
+  weaponGlow(P, ia, alpha, S, ox, oy, L, R, T, B, rt, camX, camY, ppx, ppy) {
+    const ctx = this.ctx, TAU = 6.2832, WG = WEAPON_GLOW;
+    ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    for (let i = 0; i < P.count; i++) {
+      const kd = P.kind[i];
+      if (P.alive[i] === 0) continue;
+      const g = WG[kd];
+      if (!g) continue;
+      const x = P.px[i] * ia + P.x[i] * alpha, y = P.py[i] * ia + P.y[i] * alpha;
+      if (x < L || x > R || y < T || y > B) continue;
+      const sx = x * S + ox, sy = y * S + oy, col = P.evo[i] ? g.evo : g.c;
+      const v = Math.sqrt(P.vx[i] * P.vx[i] + P.vy[i] * P.vy[i]) || 1, ux = P.vx[i] / v, uy = P.vy[i] / v;
+      if (g.t === 'tail') {
+        // scia affusolata dietro al proiettile: larga e tenue, poi stretta e chiara
+        const len = g.len * (P.evo[i] ? 1.4 : 1);
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = 0.28; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - ux * len, sy - uy * len); ctx.stroke();
+        ctx.globalAlpha = 0.55; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - ux * len * 0.6, sy - uy * len * 0.6); ctx.stroke();
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(sx + ux, sy + uy); ctx.lineTo(sx - ux * len * 0.3, sy - uy * len * 0.3); ctx.stroke();
+      } else if (g.t === 'spin') {
+        // vortice: due archi che inseguono la rotazione dell'arma
+        const rr = g.r * P.size[i], a = rt * g.spin * (kd === PK.AXE && P.vx[i] < 0 ? -1 : 1) + i;
+        ctx.strokeStyle = col;
+        for (let q = 0; q < 2; q++) {
+          const a0 = a + q * Math.PI;
+          ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, rr, a0 - 1.6, a0); ctx.stroke();
+          ctx.globalAlpha = 0.85; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(sx, sy, rr, a0 - 0.6, a0); ctx.stroke();
+        }
+        ctx.globalAlpha = 0.18; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sx, sy, rr * 1.15, 0, TAU); ctx.fill();
+      } else if (g.t === 'flame') {
+        // fuoco fatuo: fiamma a palline che si rimpiccioliscono all'indietro, sfarfalla
+        ctx.fillStyle = col;
+        for (let q = 0; q < 6; q++) {
+          const d = q * 2.2, j = Math.sin(rt * 30 + i + q * 1.7) * 0.8 * q / 6;
+          ctx.globalAlpha = 0.55 * (1 - q / 6);
+          ctx.beginPath(); ctx.arc(sx - ux * d - uy * j, sy - uy * d + ux * j, 3.2 - q * 0.45, 0, TAU); ctx.fill();
+        }
+      }
+    }
+    // sfere orbitanti: arco luminoso dietro a ognuna
+    for (let i = 0; i < Player.weapons.length; i++) {
+      const w = Player.weapons[i];
+      if (w.id !== 'orbit' || (w.special && w.special.fx === 'stelle')) continue;
+      const st = wStats(w), no = amt(st), step = TAU / no, R2 = st.radius * Player.areaMult * S;
+      const cx = camX * S + ox, cy = camY * S + oy;
+      ctx.strokeStyle = w.evolved ? '#ff5fe0' : '#7fd7ff';
+      for (let k = 0; k < no; k++) {
+        const a = w.angle + k * step;
+        ctx.globalAlpha = 0.25; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, R2, a - 0.7, a); ctx.stroke();
+        ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, R2, a - 0.35, a); ctx.stroke();
+        ctx.globalAlpha = 0.35; ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R2, cy + Math.sin(a) * R2, 6, 0, TAU); ctx.fill();
+      }
+    }
+    // raggi del Lume: fascio liscio a strati sopra a quello a pixel
+    for (let i = 0; i < Player.weapons.length; i++) {
+      const w = Player.weapons[i];
+      if (w.id !== 'beam') continue;
+      const st = wStats(w), nb = amt(st), Rb = st.range * Player.areaMult * S, step = TAU / nb, fl = 0.85 + 0.15 * Math.sin(rt * 40);
+      for (let k = 0; k < nb; k++) {
+        const a = w.angle + k * step, ex = ppx + Math.cos(a) * Rb, ey = ppy + Math.sin(a) * Rb, bx = ppx + Math.cos(a) * 7, by = ppy + Math.sin(a) * 7;
+        ctx.strokeStyle = w.evolved ? '#ff5fe0' : '#ffc94a';
+        ctx.globalAlpha = 0.22 * fl; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.globalAlpha = 0.45 * fl; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ex, ey); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1; ctx.lineCap = 'butt'; ctx.globalCompositeOperation = 'source-over';
+  },
+
+  // BUCHI E BRACCIA (Pits, Scavatore) in alta risoluzione. layer 0 = il buco (sotto), 1 = il braccio (sopra).
+  // Il buco si apre con le crepe e un bordo che lampeggia (avviso); il braccio sale dritto, la mano artigliata si apre e
+  // colpisce, poi rientra.
+  drawPits(S, ox, oy, layer, rt) {
+    const P = Pits, F = FOSSOR;
+    if (P.n === 0) return;
+    const ctx = this.ctx, TAU = 6.2832;
+    for (let k = 0; k < P.n; k++) {
+      const t = P.t[k], x = P.x[k] * S + ox, y = P.y[k] * S + oy, R = F.r * S;
+      const open = Math.min(1, t / (F.tell * 0.6)), close = t > PIT_END - 0.35 ? (PIT_END - t) / 0.35 : 1;
+      if (layer === 0) {
+        const rw = R * open * (0.4 + 0.6 * close), rh = rw * 0.5;
+        // crepe che si allargano
+        ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 1; ctx.globalAlpha = 0.8 * close;
+        ctx.beginPath();
+        for (let c = 0; c < 6; c++) { const a = c * 1.05 + k, l = R * (0.9 + 0.5 * open); ctx.moveTo(x + Math.cos(a) * rw * 0.8, y + Math.sin(a) * rh * 0.8); ctx.lineTo(x + Math.cos(a + 0.2) * l, y + Math.sin(a + 0.2) * l * 0.5); }
+        ctx.stroke();
+        // bordo di terra e buco nero
+        ctx.globalAlpha = close; ctx.fillStyle = '#4a3420'; ctx.beginPath(); ctx.ellipse(x, y, rw + 2.5, rh + 1.5, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#050304'; ctx.beginPath(); ctx.ellipse(x, y, rw, rh, 0, 0, TAU); ctx.fill();
+        // avviso: anello rosso che lampeggia finché il braccio non esce
+        if (t < F.tell) {
+          ctx.globalAlpha = 0.5 + 0.5 * ((((rt * 10) | 0) & 1)); ctx.strokeStyle = '#ff3b1f'; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.5, 0, 0, TAU); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      if (t < F.tell) continue;
+      // BRACCIO (2026-10-28, rifatto): esce piano (FOSSOR.rise) da un buco, braccio di cadavere muscoloso e piegato,
+      // mano a 5 dita con nocche e artigli neri che si apre, resta, poi si chiude ad afferrare e rientra.
+      const u = t - F.tell, r0 = Math.min(1, u / F.rise), rise = 1 - (1 - r0) * (1 - r0) * (1 - r0);
+      const h = R * 3.6 * rise * close, sd = P.side[k], sway = Math.sin(u * 4 + k) * R * 0.06 * sd;
+      const w = R * 0.5, wx = x + sway + sd * h * 0.16, wy = y - h;          // polso
+      const ex = x + sd * w * 0.9 + sway * 0.5, ey = y - h * 0.5;            // gomito (piega verso il lato)
+      const grab = u > F.up * 0.75 ? Math.min(1, (u - F.up * 0.75) / (F.up * 0.25)) : 0;   // alla fine stringe il pugno
+      const op = Math.min(1, Math.max(0, (u - F.rise * 0.6) / 0.25)) * (1 - grab);         // quanto è aperta la mano
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x - R * 3, y - R * 7, R * 6, R * 7 + 1); ctx.clip();   // il braccio sparisce sotto il bordo del buco
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      // contorno scuro, poi carne, poi lato in ombra e luce: braccio come una linea spessa che si assottiglia
+      for (let pass = 0; pass < 3; pass++) {
+        ctx.strokeStyle = pass === 0 ? '#1c1418' : pass === 1 ? '#7d6e74' : '#9e9095';
+        const bw = pass === 0 ? 2.2 : pass === 1 ? 1.7 : 0.7;
+        ctx.lineWidth = w * bw;
+        ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.quadraticCurveTo(ex, ey, wx, wy + w * 0.4);
+        if (pass === 2) { ctx.lineWidth = w * 0.35; ctx.strokeStyle = '#b5a9ad'; ctx.beginPath(); ctx.moveTo(x - sd * w * 0.35, y); ctx.quadraticCurveTo(ex - sd * w * 0.45, ey, wx - sd * w * 0.3, wy + w * 0.6); }
+        ctx.stroke();
+      }
+      // ombra sul lato esterno + tendini e una vena
+      ctx.strokeStyle = '#4e4249'; ctx.lineWidth = w * 0.45;
+      ctx.beginPath(); ctx.moveTo(x + sd * w * 0.55, y + 2); ctx.quadraticCurveTo(ex + sd * w * 0.5, ey, wx + sd * w * 0.45, wy + w * 0.7); ctx.stroke();
+      ctx.strokeStyle = '#5f3f55'; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(x - sd * w * 0.1, y - 2); ctx.quadraticCurveTo(ex - sd * w * 0.2, ey + w, wx - sd * w * 0.1, wy + w * 1.2); ctx.stroke();
+      // palmo
+      ctx.fillStyle = '#1c1418'; ctx.beginPath(); ctx.ellipse(wx, wy - w * 0.15, w * 1.05, w * 0.85, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#857679'; ctx.beginPath(); ctx.ellipse(wx, wy - w * 0.15, w * 0.88, w * 0.7, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#a3969a'; ctx.beginPath(); ctx.ellipse(wx - sd * w * 0.25, wy - w * 0.3, w * 0.4, w * 0.3, 0, 0, TAU); ctx.fill();
+      // 5 dita: 2 falangi ciascuna (si aprono a ventaglio, poi si chiudono), nocca, artiglio nero ricurvo
+      for (let f = 0; f < 5; f++) {
+        const thumb = f === 0, fi = thumb ? -2.4 : f - 2.5;
+        const a = -Math.PI / 2 + fi * (0.2 + 0.2 * op) * (thumb ? 0.9 : 1) * -sd;
+        const l1 = w * (thumb ? 0.8 : f === 2 || f === 3 ? 1.15 : 0.95), l2 = l1 * 0.8;
+        const bx = wx + Math.cos(a) * w * 0.75, by = wy - w * 0.15 + Math.sin(a) * w * 0.55;
+        const a2 = a + (0.5 + 0.9 * grab - 0.35 * op) * sd;   // la seconda falange si piega (artiglia)
+        const mx = bx + Math.cos(a) * l1, my = by + Math.sin(a) * l1, tx = mx + Math.cos(a2) * l2, ty = my + Math.sin(a2) * l2;
+        ctx.strokeStyle = '#1c1418'; ctx.lineWidth = w * 0.5;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.strokeStyle = '#857679'; ctx.lineWidth = w * 0.32;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.fillStyle = '#a3969a'; ctx.beginPath(); ctx.arc(mx, my, w * 0.13, 0, TAU); ctx.fill();   // nocca
+        const a3 = a2 + 0.7 * sd, cl = w * 0.55;
+        ctx.strokeStyle = '#0d0809'; ctx.lineWidth = w * 0.2;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo(tx + Math.cos(a2) * cl * 0.7, ty + Math.sin(a2) * cl * 0.7, tx + Math.cos(a3) * cl, ty + Math.sin(a3) * cl); ctx.stroke();
+        ctx.strokeStyle = '#6e5a60'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + Math.cos(a2) * cl * 0.5, ty + Math.sin(a2) * cl * 0.5); ctx.stroke();
+      }
+      ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+      ctx.restore();
+      // bordo davanti del buco sopra al braccio: zolle di terra
+      ctx.fillStyle = '#4a3420';
+      ctx.beginPath(); ctx.ellipse(x, y, R + 2.5, R * 0.5 + 1.5, 0, 0, Math.PI); ctx.ellipse(x, y + 1, R * 0.92, R * 0.42, 0, Math.PI, 0, true); ctx.fill();
+      ctx.fillStyle = '#6a4c2e';
+      for (let c = 0; c < 5; c++) { const a = 0.35 + c * 0.6, zx = x + Math.cos(a) * R, zy = y + Math.sin(a) * R * 0.5; ctx.beginPath(); ctx.arc(zx, zy, 1.6 + (c & 1), 0, TAU); ctx.fill(); }
+      // terra che schizza all'uscita
+      if (u < 0.35) {
+        ctx.fillStyle = '#5a4028'; ctx.globalAlpha = 1 - u / 0.35;
+        for (let c = 0; c < 10; c++) { const a = c * 0.628 + k, d = R * (0.6 + u * 4); ctx.beginPath(); ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.5 - u * 40 + u * u * 120, 1.2 + (c % 3) * 0.5, 0, TAU); ctx.fill(); }
+        ctx.globalAlpha = 1;
+      }
+    }
+  },
+
+  // bottiglia lanciata (Ignis: fire = true; Aqua Stygia: fire = false). sx/sy = punto a terra, h = altezza in pixel
+  bottle(sx, sy, h, p, fire, evo, rt, i) {
+    const ctx = this.ctx, TAU = 6.2832, by = sy - h;
+    // ombra
+    ctx.globalAlpha = 0.45; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(sx, sy + 2, 3 + h * 0.04, 1.4 + h * 0.015, 0, 0, TAU); ctx.fill();
+    // scia: scintille (Ignis) o gocce (Aqua) che cadono dietro
+    const liq = fire ? (evo ? '#ff5fe0' : '#ff7a1f') : (evo ? '#ff3a3a' : '#7dff4a');
+    ctx.globalCompositeOperation = fire ? 'lighter' : 'source-over'; ctx.fillStyle = liq;
+    for (let q = 1; q <= 4; q++) {
+      const ph = (rt * 6 + q * 0.27 + i * 0.13) % 1;
+      ctx.globalAlpha = 0.7 * (1 - ph);
+      ctx.beginPath(); ctx.arc(sx + Math.sin(i + q * 2.1) * 3, by + 3 + ph * 8 + q, fire ? 0.9 : 0.8 + (1 - ph) * 0.6, 0, TAU); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    // la bottiglia gira
+    ctx.save(); ctx.translate(sx, by); ctx.rotate(p * 12.566 * ((i & 1) ? 1 : -1));
+    if (fire) {
+      // fiasca tonda di vetro scuro, fuoco dentro, collo, tappo e miccia
+      ctx.fillStyle = '#140a08'; ctx.beginPath(); ctx.arc(0, 1, 5, 0, TAU); ctx.fill(); ctx.fillRect(-1.8, -6.5, 3.6, 4);
+      ctx.fillStyle = evo ? '#7a1a5a' : '#8a2a0a'; ctx.beginPath(); ctx.arc(0, 1, 4, 0, TAU); ctx.fill();
+      const fl = 0.75 + 0.25 * Math.sin(rt * 25 + i);
+      ctx.fillStyle = evo ? '#ff5fe0' : '#ff8a1f'; ctx.beginPath(); ctx.arc(0, 2, 3 * fl, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(0.3, 2.4, 1.4 * fl, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.ellipse(-1.8, -0.6, 1, 1.6, 0.5, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;   // riflesso
+      ctx.fillStyle = '#6a4a2a'; ctx.fillRect(-1.2, -7.5, 2.4, 1.6);   // tappo
+      ctx.strokeStyle = '#c8b090'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(0, -7.5); ctx.quadraticCurveTo(2, -9, 1.5, -10.5); ctx.stroke();   // miccia
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = '#fff2a0';
+      for (let q = 0; q < 3; q++) { const a = rt * 30 + q * 2.1; ctx.beginPath(); ctx.arc(1.5 + Math.cos(a) * 1.4, -10.5 + Math.sin(a) * 1.4, 0.6, 0, TAU); ctx.fill(); }
+      ctx.globalCompositeOperation = 'source-over';
+    } else {
+      // ampolla alta: pancia, collo lungo, liquido che si muove, bolle
+      ctx.fillStyle = '#0a160a';
+      ctx.beginPath(); ctx.moveTo(-1.6, -7); ctx.lineTo(1.6, -7); ctx.lineTo(1.6, -2.5); ctx.lineTo(4.8, 3); ctx.quadraticCurveTo(5, 5.5, 2.5, 5.5); ctx.lineTo(-2.5, 5.5); ctx.quadraticCurveTo(-5, 5.5, -4.8, 3); ctx.lineTo(-1.6, -2.5); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = evo ? '#a0141c' : '#2f9a22';
+      ctx.beginPath(); ctx.moveTo(-3.2, 1 + Math.sin(rt * 9 + i) * 0.5); ctx.lineTo(3.2, 1 - Math.sin(rt * 9 + i) * 0.5); ctx.lineTo(3.9, 3.2); ctx.quadraticCurveTo(4, 4.6, 2.2, 4.6); ctx.lineTo(-2.2, 4.6); ctx.quadraticCurveTo(-4, 4.6, -3.9, 3.2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = liq; ctx.beginPath(); ctx.arc(-1, 2.8, 0.7, 0, TAU); ctx.arc(1.4, 3.4, 0.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.6; ctx.fillRect(-1, -6, 0.7, 3.5); ctx.globalAlpha = 1;   // riflesso sul vetro
+      ctx.fillStyle = '#d8b04a'; ctx.fillRect(-2, -8.2, 4, 1.4);   // tappo con sigillo d'oro
+    }
+    ctx.restore();
+  },
+
+  // POZZA ACIDA (Aqua Stygia) in alta risoluzione: bordo che ondeggia, liquido a strati, riflesso e bolle che scoppiano.
+  // kind 0 = acido verde, 1 = pozza che rallenta (azzurra), 2 = evoluta Flegetonte (sangue che bolle)
+  acidPool(x, y, r, fade, rt, i, kind) {
+    const ctx = this.ctx, TAU = 6.2832;
+    const c0 = kind === 2 ? '#3a0608' : kind === 1 ? '#0e2a44' : '#123a0c', c1 = kind === 2 ? '#a0141c' : kind === 1 ? '#2f7fc0' : '#3fae2a';
+    const c2 = kind === 2 ? '#ff5a3a' : kind === 1 ? '#9fdcff' : '#b6ff5a';
+    // bordo mosso: 10 cerchietti che respirano attorno + il disco
+    ctx.globalAlpha = 0.6 * fade; ctx.fillStyle = c0;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    for (let q = 0; q < 10; q++) { const a = q * 0.628 + i, rr = r * (0.22 + 0.06 * Math.sin(rt * 3 + q * 1.7 + i)); ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 0.85, y + Math.sin(a) * r * 0.85, rr, 0, TAU); ctx.fill(); }
+    ctx.globalAlpha = 0.55 * fade; ctx.fillStyle = c1;
+    ctx.beginPath(); ctx.arc(x, y, r * 0.8, 0, TAU); ctx.fill();
+    // riflesso lucido
+    ctx.globalAlpha = 0.35 * fade; ctx.fillStyle = c2;
+    ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.3, r * 0.35, r * 0.16, -0.6, 0, TAU); ctx.fill();
+    // bolle: nascono, crescono e scoppiano (anellino)
+    for (let q = 0; q < 4; q++) {
+      const ph = (rt * (0.9 + q * 0.23) + i * 0.37 + q * 0.25) % 1, a = q * 1.9 + i * 2.3, d = r * (0.2 + 0.45 * ((q * 37 + i * 11) % 10) / 10);
+      const bx = x + Math.cos(a) * d, by = y + Math.sin(a) * d;
+      if (ph < 0.8) { ctx.globalAlpha = 0.8 * fade; ctx.strokeStyle = c2; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(bx, by, 0.6 + ph * 2.2, 0, TAU); ctx.stroke(); }
+      else { ctx.globalAlpha = (1 - (ph - 0.8) / 0.2) * fade; ctx.strokeStyle = c2; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(bx, by, 2.4 + (ph - 0.8) * 15, 0, TAU); ctx.stroke(); }
+    }
+    // fumo leggero che sale (acido/sangue che bolle)
+    if (kind !== 1) { ctx.fillStyle = c1; for (let q = 0; q < 2; q++) { const ph = (rt * 0.6 + q * 0.5 + i * 0.13) % 1; ctx.globalAlpha = 0.25 * (1 - ph) * fade; ctx.beginPath(); ctx.arc(x + (q ? r * 0.3 : -r * 0.2), y - ph * r * 0.9, 1.5 + ph * 3, 0, TAU); ctx.fill(); } }
+    ctx.globalAlpha = 1;
+  },
+
+  // PIOGGIA DI METEORE (Meteors): segno rosso a terra che si stringe + sasso infuocato che cade in diagonale con la scia
+  drawMeteors(S, ox, oy, rt) {
+    const M = Meteors;
+    if (M.n === 0) return;
+    const ctx = this.ctx, TAU = 6.2832;
+    for (let k = 0; k < M.n; k++) {
+      const p = 1 - M.t[k] / M.t0[k], tx = M.x[k] * S + ox, ty = M.y[k] * S + oy, rr = M.r[k] * S;
+      // segno a terra
+      ctx.globalAlpha = 0.15 + 0.25 * p; ctx.fillStyle = '#ff3b1f';
+      ctx.beginPath(); ctx.ellipse(tx, ty, rr, rr * 0.55, 0, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.5 + 0.5 * p; ctx.strokeStyle = (((rt * 12) | 0) & 1) ? '#ffd25a' : '#ff3b1f'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(tx, ty, rr * (1.4 - 0.4 * p), rr * 0.55 * (1.4 - 0.4 * p), 0, 0, TAU); ctx.stroke();
+      // la meteora: arriva dall'alto a sinistra
+      const q = 1 - p, mx = tx - 70 * q, my = ty - 170 * q, z = 3.5 + M.r[k] * S * 0.08 + (M.fire[k] ? 1.5 : 0);
+      const ux = 70 / 184, uy = 170 / 184, len = 26 + 20 * q;
+      ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      ctx.strokeStyle = '#ff5a1a'; ctx.globalAlpha = 0.35; ctx.lineWidth = z * 2.4;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx - ux * len, my - uy * len); ctx.stroke();
+      ctx.strokeStyle = '#ffb347'; ctx.globalAlpha = 0.6; ctx.lineWidth = z * 1.3;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx - ux * len * 0.65, my - uy * len * 0.65); ctx.stroke();
+      ctx.strokeStyle = '#fff2c0'; ctx.globalAlpha = 0.9; ctx.lineWidth = z * 0.5;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx - ux * len * 0.3, my - uy * len * 0.3); ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over'; ctx.lineCap = 'butt'; ctx.globalAlpha = 1;
+      ctx.fillStyle = '#3a1410'; ctx.beginPath(); ctx.arc(mx, my, z, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ff7a1f'; ctx.beginPath(); ctx.arc(mx - z * 0.25, my - z * 0.25, z * 0.6, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(mx - z * 0.35, my - z * 0.35, z * 0.28, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  },
+
+  // EFFETTI DELLE ABILITÀ (SkillFx): forme lisce a mezzi pixel (il canvas è 2x)
+  drawSkillFx(S, ox, oy) {
+    if (!SkillFx.slot.length) return;
+    const ctx = this.ctx, TAU = 6.2832;
+    for (const f of SkillFx.slot) {
+      if (!f.on) continue;
+      const D = SKILL_FX[f.kind], p = (G.time - f.t0) / D.dur;
+      if (p >= 1 || p < 0) { f.on = false; continue; }
+      const q = 1 - p, e = 1 - q * q * q, cx = f.x * S + ox, cy = f.y * S + oy, R = f.r * S * e;
+      if (f.kind === 'ira') {
+        // bagliore a terra
+        ctx.globalAlpha = 0.28 * q; ctx.fillStyle = '#ff4a12';
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 0.22 * q; ctx.fillStyle = '#ffb347';
+        ctx.beginPath(); ctx.arc(cx, cy, R * 0.6, 0, TAU); ctx.fill();
+        // lampo bianco iniziale
+        if (p < 0.18) { ctx.globalAlpha = 1 - p / 0.18; ctx.fillStyle = '#fff6d8'; ctx.beginPath(); ctx.arc(cx, cy, 10 + R * 0.35, 0, TAU); ctx.fill(); }
+        // lingue di fuoco sul fronte dell'onda (rosse fuori, gialle dentro)
+        for (let k = 0; k < D.n; k++) {
+          const a = k / D.n * TAU + f.a[0] * 0.2, ux = Math.cos(a), uy = Math.sin(a), wx = -uy, wy = ux;
+          const L = R * (0.18 + 0.22 * f.v[k]) * q, b = R * 0.07 + 1.5, r0 = R * 0.9;
+          ctx.globalAlpha = q; ctx.fillStyle = '#e8321a';
+          ctx.beginPath(); ctx.moveTo(cx + ux * r0 + wx * b, cy + uy * r0 + wy * b); ctx.lineTo(cx + ux * (r0 + L), cy + uy * (r0 + L)); ctx.lineTo(cx + ux * r0 - wx * b, cy + uy * r0 - wy * b); ctx.fill();
+          ctx.fillStyle = '#ffd25a';
+          ctx.beginPath(); ctx.moveTo(cx + ux * r0 + wx * b * 0.5, cy + uy * r0 + wy * b * 0.5); ctx.lineTo(cx + ux * (r0 + L * 0.6), cy + uy * (r0 + L * 0.6)); ctx.lineTo(cx + ux * r0 - wx * b * 0.5, cy + uy * r0 - wy * b * 0.5); ctx.fill();
+        }
+        // anello dell'onda d'urto
+        ctx.globalAlpha = q; ctx.strokeStyle = '#ffe7a0'; ctx.lineWidth = 1 + 4 * q;
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = '#ff6a1f'; ctx.lineWidth = 1 + 2 * q;
+        ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, 0, TAU); ctx.stroke();
+        // braci che volano via
+        for (let k = 0; k < D.p; k++) {
+          const d = f.r * S * (0.2 + 1.1 * f.v[k]) * e, a = f.a[k];
+          ctx.globalAlpha = q * (0.6 + 0.4 * f.s[k]); ctx.fillStyle = f.s[k] > 0.5 ? '#ffe08a' : '#ff7a1f';
+          const z = 0.5 + f.s[k] * 1.2;
+          ctx.fillRect(cx + Math.cos(a) * d - z / 2, cy + Math.sin(a) * d - z / 2 - p * 8 * f.v[k], z, z);
+        }
+      } else {
+        // disco di brina
+        ctx.globalAlpha = 0.2 * q; ctx.fillStyle = '#9fdcff';
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill();
+        // cristalli di ghiaccio: rombi allungati che spuntano dal terreno, puntati verso l'esterno
+        for (let k = 0; k < D.n; k++) {
+          const a = k / D.n * TAU + f.a[1], ux = Math.cos(a), uy = Math.sin(a), wx = -uy, wy = ux;
+          const rr = R * (0.45 + 0.5 * f.v[k]), L = (10 + 14 * f.s[k]) * Math.min(1, p * 4), b = 2.5 + 2 * f.s[k];
+          const bx = cx + ux * rr, by = cy + uy * rr;
+          ctx.globalAlpha = Math.min(1, q * 1.5); ctx.fillStyle = '#cfefff'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(bx - ux * L * 0.3, by - uy * L * 0.3); ctx.lineTo(bx + wx * b, by + wy * b); ctx.lineTo(bx + ux * L, by + uy * L); ctx.lineTo(bx - wx * b, by - wy * b); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#5fb8ff'; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + ux * L, by + uy * L); ctx.lineTo(bx - wx * b * 0.5, by - wy * b * 0.5); ctx.closePath(); ctx.fill();
+        }
+        // anelli gelati
+        ctx.globalAlpha = q; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1 + 2.5 * q;
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = '#5fb8ff'; ctx.lineWidth = 1 + q;
+        ctx.beginPath(); ctx.arc(cx, cy, R * 0.92, 0, TAU); ctx.stroke();
+        // grande fiocco di neve al centro (6 bracci con rametti), gira piano
+        const fl = (24 + 14 * e) * (p < 0.15 ? p / 0.15 : 1), rot = p * 1.2;
+        ctx.globalAlpha = q; ctx.strokeStyle = '#eaf8ff'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const a = rot + k * TAU / 6, ux = Math.cos(a), uy = Math.sin(a);
+          ctx.moveTo(cx, cy); ctx.lineTo(cx + ux * fl, cy + uy * fl);
+          for (let mi = 0; mi < 2; mi++) {
+            const m = mi ? 0.72 : 0.45, mx = cx + ux * fl * m, my = cy + uy * fl * m, br = fl * (0.95 - m) * 0.7;
+            ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(a + 0.8) * br, my + Math.sin(a + 0.8) * br);
+            ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(a - 0.8) * br, my + Math.sin(a - 0.8) * br);
+          }
+        }
+        ctx.stroke(); ctx.lineCap = 'butt';
+        // scintille che brillano
+        ctx.fillStyle = '#ffffff';
+        for (let k = 0; k < D.p; k++) {
+          const d = f.r * S * f.v[k] * e, a = f.a[k], tw = 0.5 + 0.5 * Math.sin(p * 20 + f.s[k] * 9);
+          ctx.globalAlpha = q * tw; const sx = cx + Math.cos(a) * d, sy = cy + Math.sin(a) * d, z = 1 + f.s[k] * 1.5;
+          ctx.fillRect(sx - z, sy - 0.25, z * 2, 0.5); ctx.fillRect(sx - 0.25, sy - z, 0.5, z * 2);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  },
+
   spr(s, img, wx, wy) {
     this.ctx.drawImage(img, Math.round(wx / CFG.UNIT) + this.ox - (s.w >> 1), Math.round(wy / CFG.UNIT) + this.oy - (s.h >> 1), s.w, s.h);
   },
@@ -421,12 +765,8 @@ const Render = {
       const zw = Zones.src[i] >= 0 ? Player.weapons[Zones.src[i]] : null;
       if (zw && zw.special && zw.special.fx === 'sabbione' && zw.id === 'bomb') { this.firePool(zx, zy, zr, fade, rt, i); continue; }
       if (zw && zw.id === 'caltrops') { this.caltrop(zx, zy, zr, fade, zw.evolved, i); continue; }
-      ctx.globalAlpha = 0.55 * fade; this.ditherDisk(zx, zy, zr, this.pat(Zones.slow[i] ? PAL.e : PAL.d)); ctx.globalAlpha = 1;
-      this.circle(zx, zy, zr, zw && zw.evolved ? PAL['~'] : Zones.slow[i] ? PAL.e : PAL.c);
-      const b = ((rt * 3 + i) | 0) % 5;
-      ctx.fillStyle = PAL.e;
-      ctx.fillRect(zx + ((b * 7) % (zr + 1)) - (zr >> 1), zy + ((b * 5) % (zr + 1)) - (zr >> 1), 1, 1);
-      ctx.fillRect(zx - ((b * 3) % (zr + 1)) + (zr >> 2), zy - ((b * 11) % (zr + 1)) + (zr >> 2), 1, 1);
+      if (zw && zw.id === 'meteor') { this.firePool(zx, zy, zr, fade, rt, i); continue; }   // Stelle Cadenti: terra in fiamme
+      this.acidPool(Zones.x[i] * S + ox, Zones.y[i] * S + oy, Zones.r[i] * S, fade, rt, i, zw && zw.evolved ? 2 : Zones.slow[i] ? 1 : 0);
     }
 
     // pozze di veleno (Slime Velenoso)
@@ -470,12 +810,16 @@ const Render = {
       }
     }
 
-    // NOTTE: velo blu-nero sul mondo (terreno, ostacoli, pozze, gemme) tranne il cerchio di luce attorno a te.
-    // I dannati e i boss si disegnano SOPRA al velo (si vedono sempre), poi li scurisce un velo più leggero (NIGHT.enemyDim).
-    let veilK = 0;
+    // NOTTE (dal 2026-10-28): niente buio né cerchio di luce, si vede tutto. Il mondo (terreno, ostacoli, pozze, gemme)
+    // prende solo colori freddi e scuri: moltiplica per un blu (NIGHT.tint) e poi una velatura blu-notte leggera (NIGHT.haze).
+    // I dannati e i boss si disegnano SOPRA, coi loro sprite notturni, così risaltano.
     if (G.nightK > 0) {
-      veilK = Math.ceil(G.nightK * 16) / 16;   // 16 gradini: il velo si ridisegna di rado
-      this.nightVeil(veilK, ppx, ppy, Math.round(NIGHT.lightR * S * (1.6 - 0.6 * veilK)));
+      const k = G.nightK;
+      ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = k;
+      ctx.fillStyle = NIGHT.tint; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = NIGHT.haze * k;
+      ctx.fillStyle = NIGHT.hazeColor; ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
     }
 
     // nemici: 2 frame di animazione "molle", sagoma bianca quando colpiti
@@ -487,6 +831,7 @@ const Render = {
       ctx.globalAlpha = 0.25 + p * 0.45; this.ditherDisk(sx, sy, Math.max(1, Math.round(r * p)), this.pat(PAL.n)); ctx.globalAlpha = 1;
       this.circle(sx, sy, r, (((rt * (6 + p * 14)) | 0) & 1) ? PAL[9] : PAL.p);
     }
+    this.drawPits(S, ox, oy, 0, rt);   // buchi degli Scavatori (sotto ai nemici)
     // ombre degli slime (passata separata, tutte sotto ai corpi)
     ctx.fillStyle = PAL.k; ctx.globalAlpha = 0.5;
     for (let i = 0; i < n; i++) {
@@ -515,22 +860,19 @@ const Render = {
       if (E.frz[i] > 0) this.frozen(x, y, E.r[i], E.frzM[i], rt);
     }
     if (Boss.active) this.drawBoss(alpha, rt);
-    // notte: i dannati fuori dalla luce un po' più scuri (lo stesso velo, più leggero)
-    if (veilK > 0) { ctx.globalAlpha = NIGHT.enemyDim; ctx.drawImage(this.veilCv, 0, 0, W, H); ctx.globalAlpha = 1; }
+    this.drawPits(S, ox, oy, 1, rt);   // braccia che escono dai buchi (sopra ai nemici)
+    this.drawSkillFx(S, ox, oy);
 
-    // granate (in volo con parabola) + ombra
-    const P = Projectiles, bs = SPR.cache.bomb;
+    // BOTTIGLIE IN VOLO (2026-10-28, alta risoluzione): Ignis = fiasca col fuoco dentro e la miccia accesa,
+    // Aqua Stygia = ampolla verde che gocciola. Girano su se stesse lungo la parabola; l'ombra a terra si stringe all'arrivo.
+    const P = Projectiles;
     for (let i = 0; i < P.count; i++) {
       const kd = P.kind[i];
       if (P.alive[i] === 0 || (kd !== PK.BOMB && kd !== PK.ACID)) continue;
       const x = P.px[i] * ia + P.x[i] * alpha, y = P.py[i] * ia + P.y[i] * alpha;
       if (x < L || x > R || y < T || y > B) continue;
-      const p = 1 - P.life[i] / P.life0[i];
-      const h = Math.sin(Math.PI * p) * 40;
-      ctx.fillStyle = PAL.k;
-      ctx.fillRect(Math.round(x * S) + ox - 2, Math.round(y * S) + oy + 2, 5, 2);
-      const sp = kd === PK.BOMB ? bs : SPR.cache.flask;
-      this.spr(sp, P.evo[i] ? sp.neon : sp.img, x, y - h);
+      const p = 1 - P.life[i] / P.life0[i], hgt = Math.sin(Math.PI * p) * 40, evo = P.evo[i];
+      this.bottle(x * S + ox, y * S + oy, hgt * S, p, kd === PK.BOMB, evo, rt, i);
     }
 
     if (camp) Camp.drawLit(ctx, S, ox, oy, rt);
@@ -548,6 +890,13 @@ const Render = {
         ctx.globalAlpha = 0.85 + 0.15 * Math.sin(rt * 9);
         if (ds) ctx.drawImage(Death.face < 0 ? ds.mir : ds.img, dx0 - (dw >> 1), top, dw, dh);
         else this.circle(dx0, dy0, 14, PAL.w);
+        // colpita: lampeggia di luce (prende danni dal 2026-10-28)
+        const dbi = Death.idx();
+        if (ds && dbi >= 0 && Enemies.flash[dbi] > 0) {
+          ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7;
+          ctx.drawImage(Death.face < 0 ? ds.mir : ds.img, dx0 - (dw >> 1), top, dw, dh);
+          ctx.globalCompositeOperation = 'source-over';
+        }
         ctx.globalAlpha = 1;
       }
     }       // la lanterna del Magister si vede anche di notte
@@ -700,6 +1049,8 @@ const Render = {
         ctx.drawImage(fs.img, sx - (fs.w >> 1), sy - (fs.h >> 1) - (((rt * 10 + i) | 0) & 1));
       }
     }
+    this.weaponGlow(P, ia, alpha, S, ox, oy, L, R, T, B, rt, camX, camY, ppx, ppy);
+    this.drawMeteors(S, ox, oy, rt);
     // Vite Aerea: scia dorata lungo la spirale (punteggiata) + elica a due pale che gira
     for (let i = 0; i < P.count; i++) {
       if (P.alive[i] === 0 || P.kind[i] !== PK.HELIX) continue;
@@ -812,6 +1163,15 @@ const Render = {
             ctx.fillRect(px0 + Math.round(ca * R * 0.62), py0 + Math.round(sa * R * 0.62), 1, 1);
           }
         }
+        if (head > tail) {                                                      // mezzaluna liscia in alta risoluzione sopra al retino
+          const a1 = ang(tail), a2 = ang(head), ccw = dir < 0, th = R * (fin ? 0.3 : 0.22) * (1 - p * 0.6);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.35 * (1 - p); ctx.fillStyle = '#dff4ff';
+          ctx.beginPath(); ctx.arc(px0, py0, R + 0.5, a1, a2, ccw); ctx.arc(px0, py0, R - th, a2, a1, !ccw); ctx.closePath(); ctx.fill();
+          ctx.globalAlpha = 0.9 * (1 - p); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(px0, py0, R, a1 + (a2 - a1) * 0.5, a2, ccw); ctx.stroke();
+          ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+        }
         if (p < 0.8) {                                                          // la lama e le sue copie sbiadite
           const bs = SPR.cache.fx_pugio, dist = Math.max(4, R - 7);
           for (let g = 2; g >= 0; g--) {
@@ -838,24 +1198,45 @@ const Render = {
         // sferzata: la frusta si srotola di lato, un'onda le corre lungo fino alla punta, poi lo schiocco
         const side = FX.x2[i], R = FX.r[i] * S, hh = FX.val[i] * S;
         const px0 = Math.round(Player.x * S) + ox, py0 = Math.round((Player.y + FX.y2[i]) * S) + oy;
-        const ext = p < 0.35 ? 1 - Math.pow(1 - p / 0.35, 3) : 1, len = Math.round(R * ext);
-        if (p < 0.3) {
-          ctx.globalAlpha = 0.3 * (1 - p / 0.3); ctx.fillStyle = this.pat(PAL.B);
-          ctx.fillRect(side > 0 ? px0 : px0 - len, py0 - Math.round(hh), len, Math.round(hh * 2)); ctx.globalAlpha = 1;
+        // 2026-10-28: rifatta in alta risoluzione. Cuoio intrecciato che si assottiglia, scia del colpo, schiocco con raggi e onda.
+        const ext = p < 0.35 ? 1 - Math.pow(1 - p / 0.35, 3) : 1, len = R * ext, evo = FX.evo[i];
+        const amp = (2 + hh * 0.4) * (1 - p * 0.8), fade = p > 0.6 ? 1 - (p - 0.6) / 0.4 : 1;
+        // scia del colpo: ventaglio chiaro dietro alla frusta
+        if (p < 0.35) {
+          ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.22 * (1 - p / 0.35); ctx.fillStyle = evo ? '#ff5fe0' : '#ffd9a0';
+          ctx.beginPath(); ctx.moveTo(px0, py0); ctx.lineTo(px0 + side * len, py0 - hh); ctx.lineTo(px0 + side * len, py0 + hh); ctx.closePath(); ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
         }
-        const amp = (2 + hh * 0.35) * (1 - p * 0.8), wave = (q) => Math.round(Math.sin(q * 0.2 - p * 18) * amp * (q / Math.max(1, R)));
-        for (let q = 4; q <= len; q++) {
-          if (p > 0.6 && ((q + ((rt * 30) | 0)) & 1)) continue;
-          const f = q / Math.max(1, R);
-          const th = f < 0.5 ? 2 : 1, wy = py0 + wave(q);
-          if (FX.evo[i]) { ctx.fillStyle = PAL['~']; ctx.fillRect(px0 + side * q, wy - 1, 1, 1); ctx.fillRect(px0 + side * q, wy + th, 1, 1); }   // evoluta: contorno neon
-          ctx.fillStyle = q > len - 3 ? (FX.evo[i] ? PAL['~'] : PAL.w) : f < 0.22 ? PAL.h : FX.evo[i] ? PAL[5] : p < 0.4 ? PAL[8] : PAL[6];
-          ctx.fillRect(px0 + side * q, wy, 1, th);
+        // la frusta: 28 tratti sempre più sottili (contorno scuro, cuoio, riflesso)
+        const N = 28; ctx.lineCap = 'round';
+        for (let pass = 0; pass < 3; pass++) {
+          ctx.strokeStyle = pass === 0 ? '#1a0e08' : pass === 1 ? (evo ? '#5a1a4a' : '#7a4528') : (evo ? '#ff5fe0' : '#c08850');
+          ctx.globalAlpha = fade * (pass === 2 ? 0.8 : 1);
+          let lx = px0, ly = py0;
+          for (let q = 1; q <= N; q++) {
+            const f = q / N, d = len * f, wy = py0 + Math.sin(d * 0.2 - p * 18) * amp * f, nx = px0 + side * d;
+            const th = 3.2 * (1 - f * 0.8);
+            ctx.lineWidth = pass === 0 ? th + 1.2 : pass === 1 ? th : th * 0.35;
+            ctx.beginPath(); ctx.moveTo(lx, ly - (pass === 2 ? th * 0.25 : 0)); ctx.lineTo(nx, wy - (pass === 2 ? th * 0.25 : 0)); ctx.stroke();
+            if (pass === 1 && (q & 1) && f < 0.8) { ctx.save(); ctx.strokeStyle = '#3a1e10'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(nx - th * 0.4, wy - th * 0.4); ctx.lineTo(nx + th * 0.2, wy + th * 0.4); ctx.stroke(); ctx.restore(); }   // intreccio
+            lx = nx; ly = wy;
+          }
         }
-        if (p > 0.3 && p < 0.6) {
-          const tx = px0 + side * len, ty = py0 + wave(len);
-          ctx.fillStyle = PAL.w; ctx.fillRect(tx - 2, ty, 5, 1); ctx.fillRect(tx, ty - 2, 1, 5);
-          ctx.fillStyle = PAL.D; ctx.fillRect(tx - 2, ty - 2, 1, 1); ctx.fillRect(tx + 2, ty + 2, 1, 1); ctx.fillRect(tx + 2, ty - 2, 1, 1); ctx.fillRect(tx - 2, ty + 2, 1, 1);
+        // impugnatura
+        ctx.globalAlpha = fade; ctx.fillStyle = '#2a1a10'; ctx.fillRect(px0 - 2, py0 - 2, 4, 4);
+        ctx.fillStyle = evo ? '#ff5fe0' : '#d8b04a'; ctx.fillRect(px0 - 1, py0 - 1, 2, 2);
+        ctx.lineCap = 'butt'; ctx.globalAlpha = 1;
+        // SCHIOCCO sulla punta: lampo, 8 raggi e un'onda che si allarga
+        if (p > 0.28 && p < 0.7) {
+          const c = (p - 0.28) / 0.42, tx = px0 + side * len, ty = py0 + Math.sin(len * 0.2 - p * 18) * amp;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 1 - c; ctx.strokeStyle = evo ? '#ff5fe0' : '#fff2c0'; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(tx, ty, 3 + c * 14, 0, 6.2832); ctx.stroke();
+          ctx.lineWidth = 1; ctx.beginPath();
+          for (let q = 0; q < 8; q++) { const a = q * 0.785 + 0.39, r1 = 2 + c * 4, r2 = 6 + c * 10 - (q & 1) * 3; ctx.moveTo(tx + Math.cos(a) * r1, ty + Math.sin(a) * r1); ctx.lineTo(tx + Math.cos(a) * r2, ty + Math.sin(a) * r2); }
+          ctx.stroke();
+          if (c < 0.4) { ctx.globalAlpha = 1 - c / 0.4; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(tx, ty, 3.5, 0, 6.2832); ctx.fill(); }
+          ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
         }
       } else if (k === FXK.NOVA) {
         // onda di gelo: anello azzurro che si allarga con le schegge di ghiaccio
@@ -929,10 +1310,28 @@ const Render = {
         this.circle(x, y, r, p < 0.6 ? PAL.Y : PAL[3]);
         if (p < 0.4) this.circle(x, y, Math.max(1, (r * 0.45) | 0), PAL.w);
       } else if (k === FXK.BOOM) {
-        const r = Math.max(1, Math.round(FX.r[i] * S * (0.4 + 0.6 * p)));
-        if (p < 0.35) { ctx.globalAlpha = 0.85; this.ditherDisk(x, y, r, this.pat(PAL.F)); ctx.globalAlpha = 1; }
-        this.circle(x, y, r, FX.evo[i] ? PAL['~'] : p < 0.5 ? PAL.P : PAL.F);
-        if (p < 0.7) this.circle(x, y, Math.max(1, (r * 0.6) | 0), PAL.G);
+        // ESPLOSIONE (2026-10-28, alta risoluzione): lampo, palla di fuoco a strati, onda d'urto, schegge, fumo che sale
+        const R0 = FX.r[i] * S, e = 1 - (1 - p) * (1 - p), fx = FX.x[i] * S + ox, fy = FX.y[i] * S + oy, sd = FX.seed[i], evo = FX.evo[i];
+        const TAU = 6.2832;
+        // fumo (sotto): 5 sbuffi grigi che salgono e si allargano
+        if (p > 0.2) {
+          ctx.fillStyle = '#2a2224';
+          for (let q = 0; q < 5; q++) { const a = sd + q * 1.256, d = R0 * 0.45 * e; ctx.globalAlpha = 0.45 * (1 - p); ctx.beginPath(); ctx.arc(fx + Math.cos(a) * d, fy + Math.sin(a) * d * 0.6 - p * R0 * 0.5, R0 * (0.2 + 0.25 * p), 0, TAU); ctx.fill(); }
+        }
+        ctx.globalCompositeOperation = 'lighter';
+        // palla di fuoco: rosso scuro fuori, arancio, giallo dentro (si spegne dal centro)
+        const fr = R0 * (0.35 + 0.65 * e);
+        ctx.globalAlpha = 0.55 * (1 - p); ctx.fillStyle = evo ? '#8a1a6a' : '#a8240c'; ctx.beginPath(); ctx.arc(fx, fy, fr, 0, TAU); ctx.fill();
+        if (p < 0.75) { ctx.globalAlpha = 0.7 * (1 - p / 0.75); ctx.fillStyle = evo ? '#ff5fe0' : '#ff7a1f'; ctx.beginPath(); ctx.arc(fx, fy, fr * 0.72, 0, TAU); ctx.fill(); }
+        if (p < 0.45) { ctx.globalAlpha = 0.9 * (1 - p / 0.45); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(fx, fy, fr * 0.45, 0, TAU); ctx.fill(); }
+        if (p < 0.12) { ctx.globalAlpha = 1 - p / 0.12; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(fx, fy, R0 * 0.5, 0, TAU); ctx.fill(); }
+        // onda d'urto
+        ctx.globalAlpha = 0.8 * (1 - p); ctx.strokeStyle = evo ? '#ff9af0' : '#ffd8a0'; ctx.lineWidth = 0.6 + 2 * (1 - p);
+        ctx.beginPath(); ctx.arc(fx, fy, R0 * (0.5 + 0.8 * e), 0, TAU); ctx.stroke();
+        // schegge incandescenti
+        ctx.fillStyle = '#ffd25a';
+        for (let q = 0; q < 10; q++) { const a = sd * 0.7 + q * 0.628 + (q & 1) * 0.3, d = R0 * (0.4 + 0.9 * e) * (0.7 + 0.3 * ((q * 7 + sd) % 3) / 2); ctx.globalAlpha = 1 - p; ctx.fillRect(fx + Math.cos(a) * d - 0.6, fy + Math.sin(a) * d - 0.6 + p * p * 6, 1.2, 1.2); }
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
       }
     }
 
@@ -966,9 +1365,9 @@ const Render = {
       ctx.fillRect(0, e2, e2, H - 2 * e2); ctx.fillRect(W - e2, e2, e2, H - 2 * e2);
     }
 
-    // notte: bordi rosso sangue
+    // notte: bordi blu gelo (erano rosso sangue)
     if (G.night) {
-      ctx.fillStyle = this.pat(PAL.A);
+      ctx.fillStyle = this.pat(NIGHT.edge);
       const e = 22;
       ctx.fillRect(0, 0, W, e); ctx.fillRect(0, H - e, W, e); ctx.fillRect(0, e, e, H - 2 * e); ctx.fillRect(W - e, e, e, H - 2 * e);
     }
@@ -1085,7 +1484,7 @@ const Render = {
   drawBoss(alpha, rt) {
     const E = Enemies, ctx = this.ctx, S = 1 / CFG.UNIT, ia = 1 - alpha;
     for (let i = 0; i < E.count; i++) {
-      if (E.alive[i] === 0 || E.big[i] === 0) continue;
+      if (E.alive[i] === 0 || E.big[i] === 0 || E.type[i] === ET.death) continue;   // la Morte si disegna a parte
       const x = E.px[i] * ia + E.x[i] * alpha, y = E.py[i] * ia + E.y[i] * alpha;
       const B = Boss.slotOf(i), cfg = (B && (B.trial || B.reef)) ? B.cfg : bossCfg(E.type[i]);   // i Custodi e Scilla hanno il loro aspetto
       const s = (cfg && SPR.cache[cfg.sprite]) || SPR.cache[ENEMY_DEFS[E.type[i]].sprite];

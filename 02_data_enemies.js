@@ -22,13 +22,21 @@ const ENEMY_DEFS = [
   { id: 'gelido',  name: 'Proditor',         sprite: 'slime_gelido',  hp: 30, speed: 54,  dmg: 9,  r: 13, mass: 2.0, xp: 3, coin: 0.018, splat: 'u' },
   // TESCHIO viola in fiamme: dal minuto 11 (SKULLS.time) arrivano SOLO loro (sprite in skull.png)
   { id: 'skull',   name: 'Calvaria',         sprite: 'mob_skull',     hp: 34, speed: 100, dmg: 11, r: 13, mass: 1.3, xp: 4, coin: 0.02,  splat: '8' },
+  // LA MORTE come "corpo" nel pool (dal 2026-10-28 si può uccidere): la muove Death.update, la disegna Render (non drawBoss).
+  // hp/r veri li mette Death (DEATH.hp, DEATH.r); dmg 0: uccide solo col tocco di Death.update.
+  { id: 'death',   name: 'La Morte',         sprite: 'mob_skull',     hp: 1,  speed: 0,   dmg: 0,  r: 40, mass: 9999, xp: 0, coin: 0, splat: '8', boss: true },
+  // SCAVATORE (2026-10-28): si ferma, scava e apre un buco sotto di te da cui esce un braccio gigante (FOSSOR, Pits)
+  { id: 'fossor',  name: 'Fossor',           sprite: 'slime_heavy',   hp: 40, speed: 58,  dmg: 9,  r: 15, mass: 3.0, xp: 4, coin: 0.025, splat: 'C' },
 ];
 // dal minuto 11 in poi i nuovi nemici (normali e sciami) sono solo teschi; niente più Cacciatori
 const SKULLS = { time: 660 };
-// LA MORTE — minuto 14, su tutte le mappe. Non si può uccidere (le armi la attraversano) e ti uccide con un colpo solo.
+// LA MORTE — minuto 14, su tutte le mappe. Ti uccide con un colpo solo, ma dal 2026-10-28 PRENDE DANNI e si può sconfiggere
+// (è un boss: le armi la mirano, ha la barra della vita). Battuta torna dopo `again` secondi con la vita x `harder`.
 // Cammina verso di te sempre più veloce (velocità = la tua x speed, che sale di accel al secondo fino a max).
 //   r = raggio del tocco | warnAt = avviso | scale = grandezza dello sprite | portrait = secondi del ritratto a tutto schermo (il gioco si ferma)
-const DEATH = { time: 840, warnAt: 828, speed: 0.72, accel: 0.012, max: 1.3, r: 40, scale: 2.2, portrait: 2.4 };
+//   hp = vita base (x difficoltà e mappa) | reward = monete (x difficoltà), gemme e forziere
+const DEATH = { time: 840, warnAt: 828, speed: 0.72, accel: 0.012, max: 1.3, r: 40, scale: 2.2, portrait: 2.4,
+                hp: 45000, again: 120, harder: 2, reward: { coins: 40, gems: 80, gemVal: 12 } };
 // LUPA (Selva Oscura): ti punta, si ferma un attimo e balza (come un piccolo Cacciatore)
 const LUPA = { chaseTime: 1.7, tell: 0.35, dashSpeed: 330, dashTime: 0.32 };
 // FURIA (Città di Dite): tiene le distanze e lancia ventagli di 3 fiammate
@@ -53,20 +61,21 @@ const ELITE = {
 };
 
 // NOTTE — dopo il minuto 6: ogni 60 s, 40 di giorno e 20 di notte; dal minuto 11 (forever) la notte non finisce più.
-// Di notte il mondo si spegne (tranne il cerchio di luce) ma i dannati restano visibili, solo un po' più scuri (enemyDim).
+// Di notte (dal 2026-10-28) si vede TUTTO: il mondo prende solo colori freddi e scuri (niente più cerchio di luce).
 const NIGHT = {
   start: 360, cycle: 60, nightLen: 20,
   forever: 660,           // da qui notte perenne
-  enemyDim: 0.3,          // quanto si scuriscono i dannati fuori dalla luce (0..1, sopra al velo)
-  lightR: 150,            // raggio (unità di mondo) della luce attorno al personaggio
-  dark: 0.9,              // quanto è scuro il mondo fuori dalla luce (0..1)
+  tint: '#7d98d6',        // il mondo viene moltiplicato per questo blu (più scuro = notte più cupa)
+  haze: 0.12,             // velatura blu-notte sopra (0..1)
+  hazeColor: '#0b1a3e',
+  edge: '#1d3f7a',        // bordi dello schermo a retino di notte
   fade: 2.5,              // secondi del crepuscolo / dell'alba
   speedMult: 1.25,        // di notte gli slime corrono di più
   dmgMult: 1.3,           // e mordono più forte
 };
 
-// VITTORIA — si vince resistendo fino al minuto 7. Poi si può continuare (modalità infinita).
-const WIN = { time: 420, warnAt: 405, reward: { coins: 5 } };   // monete x moltiplicatore difficoltà (bonus vittoria)
+// VITTORIA — si vince resistendo fino al minuto 8 (era 7 fino al 2026-10-28). Poi si può continuare (modalità infinita).
+const WIN = { time: 480, warnAt: 465, reward: { coins: 5 } };   // monete x moltiplicatore difficoltà (bonus vittoria)
 
 // SUBITO DOPO LA VITTORIA (se continui): i due guardiani della mappa (b2 + b3) arrivano INSIEME.
 // delay = secondi dal "Continua" all'arrivo, warnBefore = avviso quanti secondi prima
@@ -108,6 +117,9 @@ const TELEPORT = { cd: 4.5, dist: 175, iframes: 0.35, ghosts: 5 };
 // FRECCE SCHIVATE — una freccia degli Arcieri che ti passa vicino (entro `r`) senza colpirti = una schivata.
 // Il conto è per sempre (Save.data.dodges) e parte quando hai il teletrasporto: a `dodges` il teletrasporto si potenzia.
 const DODGE = { r: 60 };
+// SBLOCCO DEL TELETRASPORTO (2026-10-28): ogni freccia schivata (anche dei boss) conta, su più partite (Save.data.arrowStreak).
+// A `arrows` il teletrasporto è tuo per sempre. Se una freccia ti uccide il conto torna a 0. Avviso ogni `toastEvery`.
+const TELE_UNLOCK = { arrows: 100, toastEvery: 10 };
 // TELETRASPORTO POTENZIATO: più lontano, ricarica più breve, più invulnerabilità e un'onda d'urto dove atterri
 // (blastDmg cresce col tempo come la vita degli slime, x il danno del personaggio)
 const TELE_UP = { dodges: 50, cd: 3, dist: 240, iframes: 0.6, ghosts: 7, blastR: 95, blastDmg: 30, blastKb: 420 };
@@ -126,6 +138,21 @@ const SKILLS = {
 //   share = quota tra gli slime normali (x G.map.spitter) | cd = tempo tra un tiro e l'altro | tell = quanto tende l'arco
 //   lock = ultimi secondi del tell con la mira bloccata | dmgMult = danno della freccia rispetto al morso dell'arciere
 const SPIT = { share: 0.05, range: 340, cd: 5.0, tell: 0.9, lock: 0.3, speed: 330, life: 2.4, keepAway: 190, dmgMult: 2.8 };
+
+// SCAVATORE (Fossor) e BRACCIA DAL SOTTOSUOLO — su tutte le mappe dal secondo `from`, quota `share` tra i nemici normali.
+// Quando sei entro `range` si ferma `dig` secondi a scavare, poi sotto di te (un po' avanti a dove vai) si apre un buco:
+// dopo `tell` secondi ne esce un BRACCIO gigante che colpisce chi è dentro `r` (danno `dmg` x tempo, difficoltà, mappa),
+// resta su `up` secondi (chi ci passa sopra viene colpito) e rientra. Poi lo Scavatore riposa `cd` secondi.
+// rise = secondi che il braccio ci mette a uscire tutto (2026-10-28: più rari e più lenti, prima share 0.06, cd 5.5, tell 1.0)
+const FOSSOR = { from: 150, share: 0.035, range: 300, dig: 1.0, cd: 9, tell: 1.5, up: 1.1, rise: 0.35, r: 34, dmg: 22, lead: 35 };
+
+// FURIA DEI BOSS (2026-10-28) — vale per TUTTI i boss (Flegiàs, guardiani, Custodi, Scilla), sopra ai loro attacchi:
+//   hp / dmg = moltiplicatori di vita e morso | chase = più veloci a inseguirti (x velocità)
+//   arrowEvery = ogni quanto una raffica di frecce mirate (come gli Arcieri, si possono schivare) | arrows = frecce per raffica
+//   arrowSpread = apertura del ventaglio (radianti) | arrowSpeed | arrowDmg = danno base di una freccia (x tempo, difficoltà, mappa)
+//   boltEvery = ogni quanto fulmini su di te (i guardiani minori li hanno già) | bolts = quanti per volta
+//   trial = quanto valgono le frecce e i fulmini dei Custodi delle fusioni rispetto ai boss veri (più rari)
+const BOSS_FURY = { hp: 1.5, dmg: 1.25, chase: 1.45, arrowEvery: 1.7, arrows: 3, arrowSpread: 0.2, arrowSpeed: 360, arrowDmg: 16, boltEvery: 3.6, bolts: 3, trial: 0.6 };
 
 // FORZIERI — li lasciano i Cacciatori (a volte) e i boss (sempre): 1 o 3 potenziamenti
 const CHEST = { eliteChance: 0.45, three: 0.3 };

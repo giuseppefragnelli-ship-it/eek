@@ -74,10 +74,10 @@
     </div>
   </div>
   <!-- TELETRASPORTO (solo touch, dopo lo sblocco: resisti fino all'11:00 nella Palude) + frecce schivate (a 50: TELE+) -->
-  <button id="telebtn" aria-label="Teletrasporto"><span id="tele-label">TELE</span><i id="tele-n">0/50</i></button>
+  <button id="telebtn" aria-label="Teletrasporto"><svg class="skico" viewBox="0 0 24 24"><path d="M13.5 1.5 4.5 13.5h6l-1.5 9 9.5-13h-6.2z"/></svg><span id="tele-label">TELE</span><i id="tele-n">0/50</i></button>
   <!-- ABILITÀ (solo touch, dopo averle sbloccate vincendo Dite e Cocito) -->
-  <button class="skbtn" id="sk-ira" data-skill="ira" aria-label="Ira di Dite"><span>IRA</span></button>
-  <button class="skbtn" id="sk-gelo" data-skill="gelo" aria-label="Gelo di Cocito"><span>GELO</span></button>
+  <button class="skbtn" id="sk-ira" data-skill="ira" aria-label="Ira di Dite"><svg class="skico" viewBox="0 0 24 24"><path d="M12 1.5c.6 3.6 4.8 5.6 5.6 10.2.8 4.9-2.3 10.3-5.6 10.3s-6.6-3.3-6.1-8c.3-2.7 1.9-4.2 2.6-6.4 1.2 1.6 1.6 3.2 1.5 4.8 1.6-2.5 2.6-6 2-10.9z"/><path class="in" d="M12 12c.4 2 2.6 3 2.6 5.4 0 1.9-1.2 3.4-2.6 3.4s-2.6-1.5-2.4-3.4c.1-1.2.8-1.8 1.1-2.8.5.6.8 1.3.7 2 .8-1.2 1-2.6.6-4.6z"/></svg><span>IRA</span></button>
+  <button class="skbtn" id="sk-gelo" data-skill="gelo" aria-label="Gelo di Cocito"><svg class="skico line" viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9.5 3.5 12 5.5l2.5-2M9.5 20.5 12 18.5l2.5 2M3.6 10.4 6.6 9.6 5.7 6.6M18.3 17.4l-.9-3 3-.8M3.6 13.6l3 .8-.9 3M18.3 6.6l-.9 3 3 .8"/></svg><span>GELO</span></button>
   <!-- VILLAGGIO -->
   <div id="vbar" hidden></div>
   <div id="vprompt"><button class="btn default" data-act="talk"><span id="vprompt-text"></span></button></div>

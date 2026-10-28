@@ -12,8 +12,8 @@
 // al minuto 10 tutti e tre (TRIO).
 // ---------------------------------------------------------------------------
 const Boss = {
-  MAX: 4,
-  n: 0, list: new Int32Array(4), slots: [],
+  MAX: 5,                                         // 4 boss + il corpo della Morte
+  n: 0, list: new Int32Array(5), slots: [],
   active: false, idx: -1, kind: -1,
   spawned1: false, warned1: false, spawnedTrio: false, warnedTrio: false, warnedWin: false,
   duoT: 0, spawnedDuo: false, warnedDuo: false,   // duoT = secondo di arrivo dei due guardiani (lo fissa continueEndless)
@@ -58,7 +58,7 @@ const Boss = {
   // dopo Enemies.compact gli indici cambiano
   remap(map) { for (let k = 0; k < this.n; k++) this.list[k] = map[this.list[k]]; this.sync(); },
 };
-for (let k = 0; k < Boss.MAX; k++) Boss.slots.push({ kind: -1, uid: 0, cfg: {}, trial: null, state: 'walk', t: 0, dirX: 0, dirY: 0, summonT: 0, volley: 0, spiralT: 0, spiralA: 0, shotT: 0 });
+for (let k = 0; k < Boss.MAX; k++) Boss.slots.push({ kind: -1, uid: 0, cfg: {}, trial: null, state: 'walk', t: 0, dirX: 0, dirY: 0, summonT: 0, volley: 0, spiralT: 0, spiralA: 0, shotT: 0, arrowT: 0, boltT: 0 });
 
 // boss minore / maggiore della mappa in corso (nome, sprite, varianti); null per Flegiàs
 function bossCfg(type) { return type === ET.boss2 ? G.map.b2 : type === ET.boss3 ? G.map.b3 : null; }
@@ -88,6 +88,10 @@ function spawnBoss(type, quiet, cfg, trial) {
   S.t = type === ET.boss ? BOSS.chargeEvery : type === ET.boss2 ? BOSS2.strikeEvery : BOSS3.burstEvery;
   S.spiralT = 0; S.spiralA = 0; S.shotT = 0;
   S.summonT = (S.cfg.every || BOSS.summonEvery) * 0.5;
+  // FURIA: più vita e morso, frecce e fulmini partono dopo un attimo (sfasati tra un boss e l'altro)
+  const E = Enemies;
+  E.hp[i] *= BOSS_FURY.hp; E.maxHp[i] *= BOSS_FURY.hp; E.dmg[i] *= BOSS_FURY.dmg;
+  S.arrowT = 1.5 + Math.random(); S.boltT = 2.5 + Math.random() * 1.5;
   Boss.sync();
   addShake(6);
   Sfx.play('warn');
@@ -137,6 +141,7 @@ function onBossKilled(i) {
     break;
   }
   Boss.sync();
+  if (type === ET.death) { Death.killed(x, y); return; }   // LA MORTE battuta
   if (type === ET.boss2 && !Boss.has(ET.boss2)) Strikes.n = 0;
   if (trial) {
     // CUSTODE battuto: la ricetta è sbloccata per sempre (niente forziere né pietra: il premio è la fusione)
@@ -187,7 +192,7 @@ function onBossKilled(i) {
 
 function bossWalk(i, dt, d, dx, dy) {
   const E = Enemies;
-  let spd = E.speed[i];
+  let spd = E.speed[i] * BOSS_FURY.chase;
   if (d > G.viewW * 0.6) spd *= BOSS.catchUp; // non lo semini
   E.x[i] += dx / d * spd * dt;
   E.y[i] += dy / d * spd * dt;
@@ -206,13 +211,41 @@ function bossSeparate(i) {
   }
 }
 
+// FURIA (BOSS_FURY): tutti i boss tirano raffiche di frecce mirate (un po' avanti a dove stai andando)
+// e chiamano fulmini su di te; i Custodi più di rado.
+function bossFury(i, S, dt, d, dx, dy) {
+  const E = Enemies, F = BOSS_FURY, slow = S.trial ? 1 / F.trial : 1;
+  if (d > G.viewW * 0.9) return;   // fuori schermo: prima ti raggiunge
+  S.arrowT -= dt;
+  if (S.arrowT <= 0) {
+    S.arrowT = F.arrowEvery * slow * (0.85 + Math.random() * 0.3);
+    const lead = d / F.arrowSpeed * Player.speed * 0.6;
+    const tx = dx + Input.ax * lead, ty = dy + Input.ay * lead, tl = Math.sqrt(tx * tx + ty * ty) || 1;
+    const base = Math.atan2(ty / tl, tx / tl), n = F.arrows, r0 = E.r[i] * 0.6;
+    const dmg = F.arrowDmg * CFG.enemyDmgMult(G.time) * G.diff.dmg * G.map.dmg;
+    for (let k = 0; k < n; k++) {
+      const a = base + (n > 1 ? (k / (n - 1) - 0.5) * 2 * F.arrowSpread : 0), ca = Math.cos(a), sa = Math.sin(a);
+      spawnEShot(4, E.x[i] + ca * r0, E.y[i] + sa * r0, ca, sa, F.arrowSpeed, dmg);
+    }
+    Sfx.play('spit');
+  }
+  if (E.type[i] === ET.boss2) return;   // i guardiani minori i fulmini li hanno già
+  S.boltT -= dt;
+  if (S.boltT <= 0) {
+    S.boltT = F.boltEvery * slow * (0.85 + Math.random() * 0.3);
+    addStrike(Player.x + Input.ax * 45, Player.y + Input.ay * 45);
+    for (let k = 1; k < F.bolts; k++) { const a = Math.random() * 6.283, r = 40 + Math.random() * 110; addStrike(Player.x + Math.cos(a) * r, Player.y + Math.sin(a) * r); }
+  }
+}
+
 function updateBoss(i, dt) {
   const E = Enemies, S = Boss.slotOf(i);
-  if (!S) return;
+  if (!S || S.kind === ET.death) return;   // la Morte la muove Death.update
   const dx = Player.x - E.x[i], dy = Player.y - E.y[i], d = Math.sqrt(dx * dx + dy * dy) || 1;
   S.t -= dt;
   E.px[i] = E.x[i]; E.py[i] = E.y[i];
   if (Boss.n > 1) bossSeparate(i);
+  bossFury(i, S, dt, d, dx, dy);
 
   if (E.type[i] === ET.boss3) {
     // --- guardiano maggiore: raggiere e spirali di proiettili (bracci e numeri cambiano con la mappa) ---
